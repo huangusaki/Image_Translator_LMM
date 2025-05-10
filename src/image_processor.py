@@ -372,7 +372,7 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
         run_fallback_ocr =False 
         if not intermediate_blocks_for_processing and gemini_multimodal_attempted and self .last_error :
             _report_progress (42 ,f"Gemini (OpenAI兼容模式) 处理失败或未返回结果 ({self.last_error})，尝试回退 OCR。")
-            run_fallback_ocr =True 
+            run_fallback_ocr =False 
         elif ocr_main_provider_pref !='gemini':
             _report_progress (45 ,f"主要 OCR 提供者 ('{ocr_main_provider_pref}') 不是 Gemini。准备执行配置的 OCR...")
             run_fallback_ocr =True 
