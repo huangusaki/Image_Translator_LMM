@@ -1,5 +1,5 @@
-project leverages a multimodal large model to handle the complete image translation pipeline
-SAMPLE
+project leverages a multimodal large model to handle the complete image translation pipeline\n
+SAMPLE:
 ![Sample Image 4](sample/4.png)
 ![Sample Image 3](sample/3.png)
 ![Sample Image 2](sample/2.png)
