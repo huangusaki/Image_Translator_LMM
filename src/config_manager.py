@@ -1,4 +1,4 @@
-# --- START OF FILE config_manager.py ---
+                                         
 
 import configparser
 import os
@@ -9,8 +9,8 @@ DEFAULT_CONFIG = {
     'UI': {
         'background_image_path': '',
         'window_icon_path': '',
-        'background_fill_mode': 'contain', # 'contain', 'cover'
-        'background_opacity': '0.15', # 新增背景透明度配置
+        'background_fill_mode': 'contain',                     
+        'background_opacity': '0.15',            
         'last_image_dir': os.path.expanduser("~"),
         'last_bg_dir': os.path.expanduser("~"),
         'last_icon_dir': os.path.expanduser("~"),
@@ -18,8 +18,8 @@ DEFAULT_CONFIG = {
         'font_name': 'msyh.ttc',
         'fixed_font_size': '0',
         'text_padding': '3',
-        'min_font_size': '20', # 这个似乎没在当前逻辑中使用，但保留
-        'max_font_size': '96', # 这个似乎没在当前逻辑中使用，但保留
+        'min_font_size': '20',                    
+        'max_font_size': '96',                    
         'text_main_color': '255,255,255,255',
         'text_outline_color': '0,0,0,255',
         'text_outline_thickness': '2',
@@ -50,11 +50,11 @@ DEFAULT_CONFIG = {
         'request_timeout': '60',
         'target_language': 'Chinese',
     },
-    'GoogleAPI': { # 似乎未使用，但保留
+    'GoogleAPI': {            
         'service_account_json': '',
     },
     'LocalOcrAPI': {
-        'paddle_lang': 'japan', # 注意：PaddleOCR 接受 'japanese', 'korean', 'ch_sim' 等
+        'paddle_lang': 'japan',                                                   
     },
     'LocalTranslationAPI': {
         'translation_url': 'http://127.0.0.1:8000/v1/chat/completions',
@@ -65,26 +65,26 @@ DEFAULT_CONFIG = {
     },
     'Proxy': {
         'enabled': 'False',
-        'type': 'http', # 'http', 'socks5' etc.
+        'type': 'http',                        
         'host': '127.0.0.1',
-        'port': '21524', # 通常是整数，但configparser读作字符串
+        'port': '21524',                           
     }
 }
 
 class ConfigManager:
     def __init__(self, config_path=CONFIG_FILE):
         self.config_path = config_path
-        self.config = configparser.ConfigParser(interpolation=None) # Disable interpolation for literal values
+        self.config = configparser.ConfigParser(interpolation=None)                                           
         self._load_or_create_config()
 
     def _load_or_create_config(self):
         if not os.path.exists(self.config_path):
             print(f"配置文件 '{self.config_path}' 不存在，将使用默认值创建。")
             for section, options in DEFAULT_CONFIG.items():
-                if not self.config.has_section(section): # Ensure section exists before adding options
+                if not self.config.has_section(section):                                              
                     self.config.add_section(section)
                 for option, value in options.items():
-                    self.config.set(section, option, str(value)) # Store all as string initially
+                    self.config.set(section, option, str(value))                                
             self._save_config_to_file()
         else:
             try:
@@ -116,12 +116,12 @@ class ConfigManager:
                     needs_update = True
                     print(f"配置文件缺少选项 '{option}' 在节 '[{section}]' 下, 已添加默认值 '{default_value}'。")
             
-            # Check for obsolete options (optional, can be noisy if not handled carefully)
-            # for existing_option in current_options_in_section:
-            #     if existing_option not in default_options:
-            #         print(f"警告: 配置文件中存在未知/过时选项 '{existing_option}' 在节 '[{section}]' 下。")
-            #         # self.config.remove_option(section, existing_option) # Optionally remove them
-            #         # needs_update = True
+                                                                                          
+                                                                
+                                                            
+                                                                                          
+                                                                                                    
+                                           
 
         if needs_update:
             self._save_config_to_file()
@@ -147,11 +147,11 @@ class ConfigManager:
         except (configparser.NoSectionError, configparser.NoOptionError):
             if section in DEFAULT_CONFIG and option in DEFAULT_CONFIG[section]:
                  val_str = str(DEFAULT_CONFIG[section][option]).lower()
-                 return val_str in ('true', 'yes', '1', 'on') # More robust boolean check
-            return fallback # Use the provided fallback directly
+                 return val_str in ('true', 'yes', '1', 'on')                            
+            return fallback                                     
         except ValueError:
-            # print(f"警告: 配置项 [{section}]{option} 的值不是有效的布尔值，将使用回退值 {fallback}。")
-            # If value error, attempt to use default from DEFAULT_CONFIG if exists
+                                                                                 
+                                                                                  
             if section in DEFAULT_CONFIG and option in DEFAULT_CONFIG[section]:
                  val_str = str(DEFAULT_CONFIG[section][option]).lower()
                  return val_str in ('true', 'yes', '1', 'on')
@@ -166,10 +166,10 @@ class ConfigManager:
                 try:
                     return int(DEFAULT_CONFIG[section][option])
                 except (ValueError, TypeError):
-                    return fallback # Use the provided fallback
-            return fallback # Use the provided fallback
+                    return fallback                            
+            return fallback                            
         except ValueError:
-            # print(f"警告: 配置项 [{section}]{option} 的值不是有效的整数，将使用回退值 {fallback}。")
+                                                                                
             if section in DEFAULT_CONFIG and option in DEFAULT_CONFIG[section]:
                 try:
                     return int(DEFAULT_CONFIG[section][option])
@@ -177,7 +177,7 @@ class ConfigManager:
                     return fallback
             return fallback
 
-    def getfloat(self, section, option, fallback=0.0): # 新增 getfloat 方法
+    def getfloat(self, section, option, fallback=0.0):                 
         try:
             return self.config.getfloat(section, option)
         except (configparser.NoSectionError, configparser.NoOptionError):
@@ -185,10 +185,10 @@ class ConfigManager:
                 try:
                     return float(DEFAULT_CONFIG[section][option])
                 except (ValueError, TypeError):
-                    return fallback # Use the provided fallback
-            return fallback # Use the provided fallback
+                    return fallback                            
+            return fallback                            
         except ValueError:
-            # print(f"警告: 配置项 [{section}]{option} 的值不是有效的浮点数，将使用回退值 {fallback}。")
+                                                                                 
             if section in DEFAULT_CONFIG and option in DEFAULT_CONFIG[section]:
                 try:
                     return float(DEFAULT_CONFIG[section][option])
@@ -204,7 +204,7 @@ class ConfigManager:
     def save(self):
         self._save_config_to_file()
 
-    def get_raw_config_parser(self): # 似乎未使用，但保留
+    def get_raw_config_parser(self):            
         return self.config
 
-# --- END OF FILE config_manager.py ---
+                                       

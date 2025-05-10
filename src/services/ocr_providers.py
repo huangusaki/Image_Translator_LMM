@@ -1,40 +1,40 @@
-# --- START OF FILE ocr_providers.py ---
+                                        
 import os
 import time
 import json
 from abc import ABC, abstractmethod
 
-# --- Dependency availability checks FIRST ---
+                                              
 try:
     from paddleocr import PaddleOCR
     PADDLEOCR_AVAILABLE = True
 except ImportError:
     PADDLEOCR_AVAILABLE = False
-    PaddleOCR = None # Explicitly set to None if not available
+    PaddleOCR = None                                          
     print("警告：无法导入 paddleocr。本地 PaddleOCR 功能将不可用。")
 
 try:
     from google.cloud import vision
-    # import google.auth # Usually handled by library or env vars
+                                                                 
     GOOGLE_VISION_AVAILABLE = True
 except ImportError:
     GOOGLE_VISION_AVAILABLE = False
     vision = None
-    # google = None # google.api_core.exceptions might be needed by image_processor, so don't nullify 'google' itself if only vision fails
+                                                                                                                                          
     print("警告: 未安装 google-cloud-vision。Google Cloud Vision OCR 功能将不可用。")
 
 from utils.utils import process_ocr_results_merge_lines, PILLOW_AVAILABLE
 if PILLOW_AVAILABLE:
     from PIL import Image
-# Ensure PaddleOCR is imported if available for type hinting (already handled by try-except)
-# Ensure vision is imported if available for type hinting (already handled by try-except)
+                                                                                            
+                                                                                         
 
 
 class OCRResult:
     def __init__(self, text: str, bbox: list[int], original_data=None):
         self.text = text
-        self.bbox = bbox # [x_min, y_min, x_max, y_max]
-        self.original_data = original_data # e.g., raw vertices from OCR
+        self.bbox = bbox                               
+        self.original_data = original_data                              
 
     def __repr__(self):
         return f"OCRResult(text='{self.text[:20]}...', bbox={self.bbox})"
@@ -60,7 +60,7 @@ class PaddleOCRProvider(OCRProvider):
 
     def _get_instance(self):
         print(f"*** [PaddleOCRProvider._get_instance ENTERED] Current instance: {'Exists' if self.paddle_ocr_instance else 'None'} ***")
-        if not PADDLEOCR_AVAILABLE: # This check now uses the correctly defined variable
+        if not PADDLEOCR_AVAILABLE:                                                     
             self.last_error = "PaddleOCR 库未安装。"
             print("*** [PaddleOCRProvider._get_instance] PaddleOCR_AVAILABLE is False. Returning None. ***")
             return None
@@ -142,7 +142,7 @@ class GoogleVisionOCRProvider(OCRProvider):
 
     def _get_client(self):
         print(f"*** [GoogleVisionOCRProvider._get_client ENTERED] Current client: {'Exists' if self.client else 'None'} ***")
-        if not GOOGLE_VISION_AVAILABLE: # This check now uses the correctly defined variable
+        if not GOOGLE_VISION_AVAILABLE:                                                     
             self.last_error = "Google Cloud Vision 库或 google-auth 库未安装。"
             print("*** [GoogleVisionOCRProvider._get_client] GOOGLE_VISION_AVAILABLE is False. Returning None. ***")
             return None
@@ -156,9 +156,9 @@ class GoogleVisionOCRProvider(OCRProvider):
             return None
         try:
             print(f"*** [GoogleVisionOCRProvider._get_client] Setting GOOGLE_APPLICATION_CREDENTIALS to: {key_path} ***")
-            # It's generally better to pass credentials directly to the client if possible,
-            # or ensure this environment variable is set *before* the library tries to use it.
-            # For now, this follows the previous pattern.
+                                                                                           
+                                                                                              
+                                                         
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = key_path
             self.client = vision.ImageAnnotatorClient()
             print("*** [GoogleVisionOCRProvider._get_client] Google Vision client initialized successfully. ***")
@@ -211,7 +211,7 @@ class GoogleVisionOCRProvider(OCRProvider):
             print(f"*** [GoogleVisionOCRProvider.recognize_text] Raw Google Vision output (text_annotations count): {len(texts_annotations)} ***")
 
             results = []
-            # ... (rest of Google Vision result processing as before) ...
+                                                                         
             if texts_annotations and len(texts_annotations) > 1: 
                 google_raw_output_for_merging = []
                 for text_ann in texts_annotations[1:]: 
@@ -254,4 +254,4 @@ def get_ocr_provider(config_manager, provider_name: str) -> OCRProvider | None:
     else:
         print(f"*** [get_ocr_provider] Unknown OCR Provider name: {provider_name}. Returning None. ***")
         return None
-# --- END OF FILE ocr_providers.py ---
+                                      

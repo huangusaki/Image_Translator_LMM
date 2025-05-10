@@ -1,4 +1,4 @@
-# --- START OF FILE image_processor.py ---
+                                          
 import os
 import time
 import json
@@ -115,7 +115,7 @@ class ImageProcessor:
         try:
             genai.configure(api_key=api_key)
             expected_internal_model_name = f"models/{model_name}"
-            if self.gemini_model is None or \
+            if self.gemini_model is None or\
                (hasattr(self.gemini_model, 'model_name') and self.gemini_model.model_name != expected_internal_model_name):
                 self.gemini_model = genai.GenerativeModel(model_name)
             return True
@@ -342,10 +342,10 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                             gemini_data_list = json.loads(cleaned_json_text)
                             if isinstance(gemini_data_list, list):
                                 for item_idx, item_data in enumerate(gemini_data_list):
-                                    if isinstance(item_data, dict) and \
-                                       all(k in item_data for k in ['original_text', 'translated_text', 'orientation', 'bounding_box', 'font_size_category']) and \
-                                       isinstance(item_data['bounding_box'], list) and len(item_data['bounding_box']) == 4 and \
-                                       item_data['orientation'] in ["horizontal", "vertical_ltr", "vertical_rtl"] and \
+                                    if isinstance(item_data, dict) and\
+                                       all(k in item_data for k in ['original_text', 'translated_text', 'orientation', 'bounding_box', 'font_size_category']) and\
+                                       isinstance(item_data['bounding_box'], list) and len(item_data['bounding_box']) == 4 and\
+                                       item_data['orientation'] in ["horizontal", "vertical_ltr", "vertical_rtl"] and\
                                        item_data['font_size_category'] in self.font_size_mapping.keys():
                                         try:
                                             intermediate_blocks_for_processing.append({
@@ -388,9 +388,9 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
 
         if _check_cancelled(): return None
 
-        run_fallback_ocr = False # 或者还叫 run_fallback_ocr，但含义变了
+        run_fallback_ocr = False                              
         if ocr_main_provider_pref != 'gemini':
-        # 只有当主要OCR不是Gemini时，才考虑运行备用/替代OCR路径
+                                           
             _report_progress(45, f"主要 OCR 提供者 ('{ocr_main_provider_pref}') 不是 Gemini。准备执行配置的 OCR...")
             run_fallback_ocr = True
 
@@ -591,4 +591,4 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                     potential_path = os.path.join(base_path, font_file_to_try_ttc)
                     if os.path.exists(potential_path): return potential_path
         return None
-# --- END OF FILE image_processor.py ---
+                                        

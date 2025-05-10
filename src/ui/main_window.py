@@ -1,5 +1,3 @@
-# --- START OF FILE main_window.py ---
-
 import sys
 import os
 import time
@@ -27,10 +25,10 @@ from image_processor import ImageProcessor, ProcessedBlock
 from utils.utils import (
     PILLOW_AVAILABLE, pil_to_qpixmap, crop_image_to_circle,
     check_dependencies_availability, draw_processed_blocks_pil,
-    _render_single_block_pil_for_preview # Import the new preview renderer
+    _render_single_block_pil_for_preview                                  
 )
 from utils.font_utils import (
-    find_font_path # get_pil_font, get_pil_font_line_height, wrap_text_pil are used by utils
+    find_font_path                                                                          
 )
 
 from ui.glossary_settings_dialog import GlossarySettingsDialog
@@ -43,7 +41,7 @@ if PILLOW_AVAILABLE:
 
 CORNER_HANDLE_SIZE = 10
 ROTATION_HANDLE_OFFSET = 20
-# BORDER_PADDING = 2 # This might be effectively handled by text_padding now
+                                                                            
 
 
 class EditableTextDialog(QDialog):
@@ -81,17 +79,17 @@ class InteractiveLabel(QWidget):
         self.processed_blocks: list[ProcessedBlock] = []
         self.selected_block: ProcessedBlock | None = None
 
-        self._block_render_cache: dict[str, tuple[int, QPixmap]] = {} # {block.id: (block_version_hash, QPixmap)}
-        self._block_version_counter = {} # {block.id: version_int} for cache invalidation
+        self._block_render_cache: dict[str, tuple[int, QPixmap]] = {}                                            
+        self._block_version_counter = {}                                                 
 
-        self.current_scale_factor = 1.0 # For background image scaling relative to widget size
-        self.pan_offset = QPointF(0, 0) # Not fully implemented, but for future background panning
+        self.current_scale_factor = 1.0                                                       
+        self.pan_offset = QPointF(0, 0)                                                           
 
         self.dragging_block = False
         self.resizing_block = False
         self.rotating_block = False
         self.drag_offset = QPointF()
-        self.resize_corner = -1 # 0:TL, 1:TR, 2:BR, 3:BL
+        self.resize_corner = -1                         
         self.initial_block_bbox_on_drag: list[float] | None = None
         self.initial_mouse_pos_on_drag: QPointF | None = None
         self.initial_angle_on_rotate = 0.0
@@ -102,13 +100,13 @@ class InteractiveLabel(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.ClickFocus)
         self.font_size_mapping = {}
 
-        self.reload_style_configs() # Loads colors, font name, spacings etc.
+        self.reload_style_configs()                                         
         self.update()
 
     def _parse_color_str(self, color_str: str, default_color_tuple: tuple) -> tuple:
         try:
             parts = list(map(int, color_str.split(',')))
-            if len(parts) == 3: return (parts[0], parts[1], parts[2], 255) # Add full alpha
+            if len(parts) == 3: return (parts[0], parts[1], parts[2], 255)                 
             if len(parts) == 4: return (parts[0], parts[1], parts[2], parts[3])
         except:
             pass
@@ -153,26 +151,26 @@ class InteractiveLabel(QWidget):
                 self._block_version_counter[block.id] += 1
             else:
                 self._block_version_counter[block.id] = 0
-            # self._block_render_cache.pop(block.id, None) # Or rely on version check
-        else: # Invalidate all
+                                                                                     
+        else:                 
             self._block_render_cache.clear()
             self._block_version_counter.clear()
         self.update()
 
 
     def _get_block_visual_hash(self, block: ProcessedBlock) -> int:
-        # Create a hash based on properties that affect visual rendering by Pillow
-        # This is important for cache validation if blocks are modified externally.
-        # A simpler approach is to just increment a version counter for the block.
+                                                                                  
+                                                                                   
+                                                                                  
         relevant_attrs = (
             block.translated_text,
             block.font_size_pixels,
             block.orientation,
             block.text_align,
-            # block.angle is handled by QPainter transform, not Pillow render for preview
-            # block.bbox affects wrapping max_dim, so include its width/height
+                                                                                         
+                                                                              
             tuple(block.bbox) if block.bbox else None,
-            # Add all style configs that _render_single_block_pil_for_preview uses
+                                                                                  
             self._font_name_config,
             self._text_main_color_pil,
             self._text_outline_color_pil,
@@ -190,8 +188,8 @@ class InteractiveLabel(QWidget):
             return None
 
         block_id = block.id
-        current_version_hash = self._get_block_visual_hash(block) # More robust
-        # current_version = self._block_version_counter.get(block_id, 0) # Simpler versioning
+        current_version_hash = self._get_block_visual_hash(block)              
+                                                                                             
 
         if block_id in self._block_render_cache:
             cached_version_hash, cached_pixmap = self._block_render_cache[block_id]
@@ -219,9 +217,9 @@ class InteractiveLabel(QWidget):
             if q_pixmap and not q_pixmap.isNull():
                 self._block_render_cache[block_id] = (current_version_hash, q_pixmap)
                 return q_pixmap
-            else: # Failed to convert or got null pixmap
-                self._block_render_cache.pop(block_id, None) # Remove potential bad cache entry
-                return None # Indicate render/conversion failure
+            else:                                       
+                self._block_render_cache.pop(block_id, None)                                   
+                return None                                     
         
         self._block_render_cache.pop(block_id, None)
         return None
@@ -230,8 +228,8 @@ class InteractiveLabel(QWidget):
     def set_background_image(self, pixmap: QPixmap | None):
         self.background_pixmap = pixmap
         self.pan_offset = QPointF(0,0)
-        # self.current_scale_factor = 1.0 # Reset zoom on new image
-        self._scale_background_and_view() # Recalculates scale_factor
+                                                                   
+        self._scale_background_and_view()                            
         self.update()
 
     def _scale_background_and_view(self):
@@ -239,7 +237,7 @@ class InteractiveLabel(QWidget):
             widget_size = self.size()
             img_size = self.background_pixmap.size()
 
-            if img_size.width() == 0 or img_size.height() == 0 or \
+            if img_size.width() == 0 or img_size.height() == 0 or\
                widget_size.width() == 0 or widget_size.height() == 0:
                 self.scaled_background_pixmap = None
                 self.current_scale_factor = 1.0
@@ -247,7 +245,7 @@ class InteractiveLabel(QWidget):
 
             scale_x = widget_size.width() / img_size.width()
             scale_y = widget_size.height() / img_size.height()
-            self.current_scale_factor = min(scale_x, scale_y) # Fit aspect ratio
+            self.current_scale_factor = min(scale_x, scale_y)                   
 
             scaled_width = int(img_size.width() * self.current_scale_factor)
             scaled_height = int(img_size.height() * self.current_scale_factor)
@@ -259,19 +257,19 @@ class InteractiveLabel(QWidget):
             )
         else:
             self.scaled_background_pixmap = None
-            self.current_scale_factor = 1.0 # Default scale
+            self.current_scale_factor = 1.0                
         self.update()
 
 
     def set_processed_blocks(self, blocks: list[ProcessedBlock]):
         self.processed_blocks = blocks
-        self._invalidate_block_cache() # Invalidate all on new set of blocks
+        self._invalidate_block_cache()                                      
         if self.selected_block not in self.processed_blocks:
             self.set_selected_block(None)
-        # Assign unique IDs if they don't have one, for caching
+                                                               
         for i, block in enumerate(self.processed_blocks):
             if not hasattr(block, 'id') or block.id is None:
-                block.id = f"block_{time.time_ns()}_{i}" # Simple unique ID
+                block.id = f"block_{time.time_ns()}_{i}"                   
         self.update()
 
     def clear_all(self):
@@ -288,7 +286,7 @@ class InteractiveLabel(QWidget):
         if not self.background_pixmap or not PILLOW_AVAILABLE:
             return None
         
-        # Convert background QPixmap back to PIL Image for compositing
+                                                                      
         q_img_bg = self.background_pixmap.toImage().convertToFormat(QImage.Format.Format_RGBA8888)
         if q_img_bg.isNull(): return None
         
@@ -304,12 +302,12 @@ class InteractiveLabel(QWidget):
         if pil_bg_image.mode != 'RGBA':
             pil_bg_image = pil_bg_image.convert('RGBA')
 
-        # Use the main draw_processed_blocks_pil function for final export
-        # It will use the same _render_single_block_pil_for_preview internally via _draw_single_block_pil
+                                                                          
+                                                                                                         
         final_pil_image = draw_processed_blocks_pil(
             pil_bg_image, 
             self.processed_blocks, 
-            self.config_manager # draw_processed_blocks_pil loads configs internally
+            self.config_manager                                                     
         )
         return final_pil_image
 
@@ -335,7 +333,7 @@ class InteractiveLabel(QWidget):
 
         for block in self.processed_blocks:
             block_qpixmap = self._get_or_render_block_qpixmap(block)
-            # pixmap is for content, bbox is for layout area. They can differ.
+                                                                              
             
             painter.save()
             
@@ -346,8 +344,8 @@ class InteractiveLabel(QWidget):
             block_display_center_widget_x = bg_draw_x + block_display_center_x_rel_bg
             block_display_center_widget_y = bg_draw_y + block_display_center_y_rel_bg
 
-            # This transform takes points from the block's local coordinate system 
-            # (centered at 0,0, unscaled original image dimensions) to widget coordinates.
+                                                                                   
+                                                                                          
             content_transform = QTransform()
             content_transform.translate(block_display_center_widget_x, block_display_center_widget_y)
             content_transform.rotate(block.angle)
@@ -361,27 +359,27 @@ class InteractiveLabel(QWidget):
                 pixmap_draw_y = -block_qpixmap.height() / 2.0
                 painter.drawPixmap(QPointF(pixmap_draw_x, pixmap_draw_y), block_qpixmap)
             
-            painter.setWorldTransform(current_painter_transform) # Restore transform before drawing handles
-            painter.restore() # Restore from block-specific transform for drawing content
+            painter.setWorldTransform(current_painter_transform)                                           
+            painter.restore()                                                            
             
             if block == self.selected_block:
                 painter.save()
 
-                # Define the bounding box rectangle in the block's LOCAL, UNSCALED (original image) coordinate system
-                # This rectangle corresponds to block.bbox, centered at (0,0)
+                                                                                                                     
+                                                                             
                 bbox_width_orig = block.bbox[2] - block.bbox[0]
                 bbox_height_orig = block.bbox[3] - block.bbox[1]
                 
-                # This is the local rect representing the bbox boundaries, NOT necessarily the pixmap boundaries
+                                                                                                                
                 unscaled_local_bbox_rect = QRectF(
                     -bbox_width_orig / 2.0, -bbox_height_orig / 2.0,
                     bbox_width_orig, bbox_height_orig
                 )
 
-                # Use the same content_transform to draw handles around the bbox area
-                painter.setWorldTransform(content_transform, combine=False) # Set, not combine
+                                                                                     
+                painter.setWorldTransform(content_transform, combine=False)                   
 
-                effective_display_scale = (bg_img_to_display_scale_x + bg_img_to_display_scale_y) / 2.0 \
+                effective_display_scale = (bg_img_to_display_scale_x + bg_img_to_display_scale_y) / 2.0\
                                           if bg_img_to_display_scale_x > 0.001 and bg_img_to_display_scale_y > 0.001 else 1.0
                 
                 selection_pen_width = 2.0 / effective_display_scale
@@ -389,7 +387,7 @@ class InteractiveLabel(QWidget):
                 selection_pen.setStyle(Qt.PenStyle.DashLine)
                 painter.setPen(selection_pen)
                 painter.setBrush(Qt.BrushStyle.NoBrush)
-                painter.drawRect(unscaled_local_bbox_rect) # Draw the bbox outline
+                painter.drawRect(unscaled_local_bbox_rect)                        
 
                 painter.setBrush(QColor(0, 120, 215, 200))
                 painter.setPen(Qt.PenStyle.NoPen)
@@ -430,16 +428,16 @@ class InteractiveLabel(QWidget):
         
         bg_img_to_display_scale_x, bg_img_to_display_scale_y = self._get_bg_fit_scale_factors()
 
-        # Use block.bbox dimensions directly for interaction area, not rendered pixmap dimensions
-        # block.bbox is [x0, y0, x1, y1]
+                                                                                                 
+                                        
         content_width_orig = block.bbox[2] - block.bbox[0]
         content_height_orig = block.bbox[3] - block.bbox[1]
         
-        if content_width_orig <=0: content_width_orig = 1 # Avoid zero or negative width
-        if content_height_orig <=0: content_height_orig = 1 # Avoid zero or negative height
+        if content_width_orig <=0: content_width_orig = 1                               
+        if content_height_orig <=0: content_height_orig = 1                                
 
 
-        # Local rect of the content, centered at (0,0), at original image scale, based on bbox
+                                                                                              
         local_bbox_rect_orig_scale = QRectF(
             -content_width_orig / 2.0, -content_height_orig / 2.0,
             content_width_orig, content_height_orig
@@ -470,19 +468,19 @@ class InteractiveLabel(QWidget):
         return transformed_qpolygon, screen_bounding_rect, block_display_center_qpoint, transform
 
     def _get_handle_rects_for_block(self, block: ProcessedBlock) -> tuple[list[QRectF], QRectF]:
-        # This function now relies on _get_transformed_rect_for_block_interaction,
-        # which uses block.bbox for its geometry. The effective_transform returned
-        # is the one that maps the local bbox coordinates to screen coordinates.
+                                                                                  
+                                                                                  
+                                                                                
 
         _, _, _, effective_transform = self._get_transformed_rect_for_block_interaction(block)
         
-        # Dimensions from block.bbox in original image scale
+                                                            
         content_width_orig = block.bbox[2] - block.bbox[0]
         content_height_orig = block.bbox[3] - block.bbox[1]
         if content_width_orig <=0: content_width_orig = 1 
         if content_height_orig <=0: content_height_orig = 1
         
-        # Local rectangle corresponding to block.bbox, centered at (0,0), in original image scale
+                                                                                                 
         local_rect_from_bbox_orig_scale = QRectF(
             -content_width_orig / 2.0, -content_height_orig / 2.0,
             content_width_orig, content_height_orig
@@ -499,7 +497,7 @@ class InteractiveLabel(QWidget):
         unscale_y = 1.0 / bg_img_to_display_scale_y if bg_img_to_display_scale_y != 0 else 1.0
 
         rot_handle_offset_on_screen = float(ROTATION_HANDLE_OFFSET) 
-        # Convert screen offset to local offset in original image y-scale
+                                                                         
         rot_handle_offset_local_y_orig = rot_handle_offset_on_screen * unscale_y
         
         rot_handle_center_local_orig_scale = QPointF(
@@ -524,7 +522,7 @@ class InteractiveLabel(QWidget):
         if self.selected_block != block:
             self.selected_block = block
             self.selection_changed_signal.emit(self.selected_block)
-            self.update() # Redraw to show/hide selection handles
+            self.update()                                        
 
     def mousePressEvent(self, event: QMouseEvent):
         clicked_on_block_or_handle = False
@@ -539,7 +537,7 @@ class InteractiveLabel(QWidget):
                 self.initial_mouse_pos_on_drag = current_pos_widget
                 _, _, self.rotation_center_on_rotate, _ = self._get_transformed_rect_for_block_interaction(self.selected_block)
                 self.initial_angle_on_rotate = self.selected_block.angle
-                self.setCursor(Qt.CursorShape.CrossCursor) # Or a specific rotation cursor
+                self.setCursor(Qt.CursorShape.CrossCursor)                                
             else:
                 for i, corner_rect_s in enumerate(corner_rects_screen):
                     if corner_rect_s.contains(current_pos_widget):
@@ -547,10 +545,10 @@ class InteractiveLabel(QWidget):
                         self.resize_corner = i
                         clicked_on_block_or_handle = True
                         self.initial_mouse_pos_on_drag = current_pos_widget
-                        self.initial_block_bbox_on_drag = list(self.selected_block.bbox) # Store original bbox
+                        self.initial_block_bbox_on_drag = list(self.selected_block.bbox)                      
 
                         orig_bbox = self.selected_block.bbox
-                        corners_orig_bbox_coords = [ # Corners of the bbox in original image space
+                        corners_orig_bbox_coords = [                                              
                             QPointF(orig_bbox[0], orig_bbox[1]), QPointF(orig_bbox[2], orig_bbox[1]),
                             QPointF(orig_bbox[2], orig_bbox[3]), QPointF(orig_bbox[0], orig_bbox[3])
                         ]
@@ -562,7 +560,7 @@ class InteractiveLabel(QWidget):
         
         if not clicked_on_block_or_handle:
             newly_selected_block = None
-            # Iterate in reverse draw order (topmost first)
+                                                           
             for block_item in reversed(self.processed_blocks): 
                 polygon_screen, _, _, _ = self._get_transformed_rect_for_block_interaction(block_item)
                 if polygon_screen.containsPoint(current_pos_widget, Qt.FillRule.WindingFill):
@@ -571,30 +569,30 @@ class InteractiveLabel(QWidget):
             
             if newly_selected_block:
                 self.set_selected_block(newly_selected_block)
-                # If left click on a block, prepare for dragging
+                                                                
                 if event.button() == Qt.MouseButton.LeftButton:
                     self.dragging_block = True; self.resizing_block = False; self.rotating_block = False
-                    clicked_on_block_or_handle = True # Consider it handled
+                    clicked_on_block_or_handle = True                      
                     self.initial_mouse_pos_on_drag = current_pos_widget
                     self.initial_block_bbox_on_drag = list(self.selected_block.bbox)
                     self.setCursor(Qt.CursorShape.SizeAllCursor)
-            else: # Clicked on empty space
+            else:                         
                 if event.button() == Qt.MouseButton.LeftButton:
                     self.set_selected_block(None)
-                self.dragging_block = False # Ensure not dragging
+                self.dragging_block = False                      
 
         if not clicked_on_block_or_handle and event.button() == Qt.MouseButton.LeftButton:
-             super().mousePressEvent(event) # For other interactions like panning background (if implemented)
+             super().mousePressEvent(event)                                                                  
 
 
     def mouseMoveEvent(self, event: QMouseEvent):
         current_pos_widget = event.position()
-        fit_scale_x, fit_scale_y = self._get_bg_fit_scale_factors() # Scale from original image to displayed bg
+        fit_scale_x, fit_scale_y = self._get_bg_fit_scale_factors()                                            
 
         if self.dragging_block and self.selected_block and self.initial_block_bbox_on_drag and self.initial_mouse_pos_on_drag:
             delta_mouse_screen = current_pos_widget - self.initial_mouse_pos_on_drag
             
-            # Convert screen delta to delta in original image coordinates
+                                                                         
             delta_x_orig = delta_mouse_screen.x() / fit_scale_x if fit_scale_x != 0 else 0
             delta_y_orig = delta_mouse_screen.y() / fit_scale_y if fit_scale_y != 0 else 0
 
@@ -603,7 +601,7 @@ class InteractiveLabel(QWidget):
             new_x1 = self.initial_block_bbox_on_drag[2] + delta_x_orig
             new_y1 = self.initial_block_bbox_on_drag[3] + delta_y_orig
             self.selected_block.bbox = [new_x0, new_y0, new_x1, new_y1]
-            self._invalidate_block_cache(self.selected_block) # Bbox change affects wrapping
+            self._invalidate_block_cache(self.selected_block)                               
             self.block_modified_signal.emit(self.selected_block)
 
         elif self.rotating_block and self.selected_block and self.initial_mouse_pos_on_drag and self.rotation_center_on_rotate:
@@ -614,12 +612,12 @@ class InteractiveLabel(QWidget):
             delta_angle_rad = angle_current_rad - angle_initial_rad
             delta_angle_deg = math.degrees(delta_angle_rad)
             self.selected_block.angle = (self.initial_angle_on_rotate + delta_angle_deg) % 360.0
-            # No need to invalidate cache for angle change, as QPainter handles rotation
-            self.update() # Just redraw for visual feedback of rotation
+                                                                                        
+            self.update()                                              
             self.block_modified_signal.emit(self.selected_block)
 
         elif self.resizing_block and self.selected_block and self.initial_block_bbox_on_drag and self.initial_mouse_pos_on_drag and self.resize_anchor_opposite_corner_orig:
-            # Convert current mouse position to original image coordinates
+                                                                          
             bg_draw_x, bg_draw_y = 0,0
             if self.scaled_background_pixmap:
                 bg_draw_x = (self.width() - self.scaled_background_pixmap.width()) / 2.0
@@ -635,24 +633,24 @@ class InteractiveLabel(QWidget):
             fixed_anchor_y = self.resize_anchor_opposite_corner_orig.y()
             new_x0, new_y0, new_x1, new_y1 = 0.0, 0.0, 0.0, 0.0
 
-            # Determine new bbox corners based on which corner is being dragged
-            if self.resize_corner == 0: # Top-Left
+                                                                               
+            if self.resize_corner == 0:           
                 new_x0, new_y0 = current_mouse_orig.x(), current_mouse_orig.y()
                 new_x1, new_y1 = fixed_anchor_x, fixed_anchor_y
-            elif self.resize_corner == 1: # Top-Right
+            elif self.resize_corner == 1:            
                 new_x1, new_y0 = current_mouse_orig.x(), current_mouse_orig.y()
                 new_x0, new_y1 = fixed_anchor_x, fixed_anchor_y
-            elif self.resize_corner == 2: # Bottom-Right
+            elif self.resize_corner == 2:               
                 new_x1, new_y1 = current_mouse_orig.x(), current_mouse_orig.y()
                 new_x0, new_y0 = fixed_anchor_x, fixed_anchor_y
-            elif self.resize_corner == 3: # Bottom-Left
+            elif self.resize_corner == 3:              
                 new_x0, new_y1 = current_mouse_orig.x(), current_mouse_orig.y()
                 new_x1, new_y0 = fixed_anchor_x, fixed_anchor_y
             
             final_x0 = min(new_x0, new_x1); final_x1 = max(new_x0, new_x1)
             final_y0 = min(new_y0, new_y1); final_y1 = max(new_y0, new_y1)
             
-            min_bbox_dim_orig = 10 # Minimum size in original image pixels
+            min_bbox_dim_orig = 10                                        
             if final_x1 - final_x0 < min_bbox_dim_orig:
                 if self.resize_corner == 0 or self.resize_corner == 3: final_x0 = final_x1 - min_bbox_dim_orig
                 else: final_x1 = final_x0 + min_bbox_dim_orig
@@ -661,7 +659,7 @@ class InteractiveLabel(QWidget):
                 else: final_y1 = final_y0 + min_bbox_dim_orig
 
             self.selected_block.bbox = [final_x0, final_y0, final_x1, final_y1]
-            self._invalidate_block_cache(self.selected_block) # Bbox change affects wrapping
+            self._invalidate_block_cache(self.selected_block)                               
             self.block_modified_signal.emit(self.selected_block)
         else:
             self.update_cursor_on_hover(current_pos_widget)
@@ -670,7 +668,7 @@ class InteractiveLabel(QWidget):
     def mouseReleaseEvent(self, event: QMouseEvent):
         if self.dragging_block or self.resizing_block or self.rotating_block:
             if self.selected_block:
-                # Final signal emission, though it's already emitted during move for live update
+                                                                                                
                 self.block_modified_signal.emit(self.selected_block) 
         
         self.dragging_block = False
@@ -680,7 +678,7 @@ class InteractiveLabel(QWidget):
         self.initial_mouse_pos_on_drag = None
         self.resize_anchor_opposite_corner_orig = None
         
-        self.update_cursor_on_hover(event.position()) # Reset cursor to appropriate one
+        self.update_cursor_on_hover(event.position())                                  
         super().mouseReleaseEvent(event)
 
     def mouseDoubleClickEvent(self, event: QMouseEvent):
@@ -692,33 +690,33 @@ class InteractiveLabel(QWidget):
                     new_text = dialog.get_text()
                     if self.selected_block.translated_text != new_text:
                         self.selected_block.translated_text = new_text
-                        self._invalidate_block_cache(self.selected_block) # Text changed
+                        self._invalidate_block_cache(self.selected_block)               
                         self.block_modified_signal.emit(self.selected_block)
                 return
         super().mouseDoubleClickEvent(event)
 
     def wheelEvent(self, event: QWheelEvent):
-        # Could implement zooming of the background view here
-        # For now, let it propagate if not handled, or ignore explicitly.
+                                                             
+                                                                         
         event.ignore() 
 
     def _get_bg_fit_scale_factors(self) -> tuple[float, float]:
-        if self.scaled_background_pixmap and self.background_pixmap and \
-           self.background_pixmap.width() > 0 and self.background_pixmap.height() > 0 and \
+        if self.scaled_background_pixmap and self.background_pixmap and\
+           self.background_pixmap.width() > 0 and self.background_pixmap.height() > 0 and\
            self.scaled_background_pixmap.width() > 0 and self.scaled_background_pixmap.height() > 0:
-            # This is scale from original full-res background to the one displayed in widget
+                                                                                            
             return (self.scaled_background_pixmap.width() / self.background_pixmap.width(),
                     self.scaled_background_pixmap.height() / self.background_pixmap.height())
-        return 1.0, 1.0 # Default if no bg or error
+        return 1.0, 1.0                            
 
 
     def update_cursor_on_hover(self, event_pos_widget: QPointF):
-        if QApplication.mouseButtons() != Qt.MouseButton.NoButton: return # Don't change if dragging
+        if QApplication.mouseButtons() != Qt.MouseButton.NoButton: return                           
 
         if self.selected_block:
             corner_rects_s, rot_rect_s = self._get_handle_rects_for_block(self.selected_block)
             if rot_rect_s.contains(event_pos_widget):
-                self.setCursor(Qt.CursorShape.CrossCursor) # Or custom rotation cursor
+                self.setCursor(Qt.CursorShape.CrossCursor)                            
                 return
             for i, corner_s_rect in enumerate(corner_rects_s):
                 if corner_s_rect.contains(event_pos_widget):
@@ -736,14 +734,14 @@ class InteractiveLabel(QWidget):
         effective_angle = angle_degrees % 360.0
         if effective_angle < 0: effective_angle += 360.0
 
-        # Base cursors for unrotated corners
-        if corner_index == 0: base_cursor_type = Qt.CursorShape.SizeBDiagCursor    # TL
-        elif corner_index == 1: base_cursor_type = Qt.CursorShape.SizeFDiagCursor # TR
-        elif corner_index == 2: base_cursor_type = Qt.CursorShape.SizeBDiagCursor # BR
-        elif corner_index == 3: base_cursor_type = Qt.CursorShape.SizeFDiagCursor # BL
+                                            
+        if corner_index == 0: base_cursor_type = Qt.CursorShape.SizeBDiagCursor        
+        elif corner_index == 1: base_cursor_type = Qt.CursorShape.SizeFDiagCursor     
+        elif corner_index == 2: base_cursor_type = Qt.CursorShape.SizeBDiagCursor     
+        elif corner_index == 3: base_cursor_type = Qt.CursorShape.SizeFDiagCursor     
         else: base_cursor_type = Qt.CursorShape.ArrowCursor
 
-        # Simplified: Flip diagonal cursor if rotated roughly by 90 degrees
+                                                                           
         if (45 <= effective_angle < 135) or (225 <= effective_angle < 315):
             if base_cursor_type == Qt.CursorShape.SizeFDiagCursor: self.setCursor(Qt.CursorShape.SizeBDiagCursor)
             elif base_cursor_type == Qt.CursorShape.SizeBDiagCursor: self.setCursor(Qt.CursorShape.SizeFDiagCursor)
@@ -829,7 +827,7 @@ class InteractiveLabel(QWidget):
                                    bbox=new_bbox, orientation="horizontal",
                                    font_size_pixels=default_font_size_px, angle=0.0, text_align="left")
         self.processed_blocks.append(new_block)
-        self._invalidate_block_cache(new_block) # Ensure it's rendered on next paint
+        self._invalidate_block_cache(new_block)                                     
         self.set_selected_block(new_block)
         self.block_modified_signal.emit(new_block)
 
@@ -905,7 +903,7 @@ class BatchTranslationWorker(QThread):
             if result_tuple:
                 original_pil, blocks = result_tuple
                 last_proc_error = self.image_processor.get_last_error()
-                if not blocks and not last_proc_error : continue # Skip if no text and no error (e.g. empty image)
+                if not blocks and not last_proc_error : continue                                                  
 
                 final_drawn_pil_image = draw_processed_blocks_pil(original_pil, blocks, self.config_manager)
                 if final_drawn_pil_image:
@@ -955,12 +953,12 @@ class MainWindow(QMainWindow):
         self._check_dependencies_on_startup()
         self._create_actions(); self._create_menu_bar(); self._create_central_widget()
         self._connect_signals(); self._apply_initial_settings() 
-        QTimer.singleShot(100, self._initial_splitter_setup) # Delay splitter setup
+        QTimer.singleShot(100, self._initial_splitter_setup)                       
 
-    def _initial_splitter_setup(self): # Ensures splitter is sized after main window is shown
+    def _initial_splitter_setup(self):                                                       
         if hasattr(self, 'splitter') and self.splitter:
             total_width = self.splitter.width()
-            if total_width > 0 : # Check if splitter has a valid width
+            if total_width > 0 :                                      
                  self.splitter.setSizes([total_width // 3, total_width * 2 // 3])
 
     def _check_dependencies_on_startup(self):
@@ -1057,8 +1055,8 @@ class MainWindow(QMainWindow):
             s_block = self.interactive_translate_area.selected_block
             s_block.font_size_pixels = int(self.block_font_size_spin.value())
             s_block.angle = self.block_angle_spin.value()
-            self.interactive_translate_area._invalidate_block_cache(s_block) # Angle doesn't need Pillow re-render, but font size does
-            self.interactive_translate_area.update() # Redraw for angle, or if font size changed and cache was hit for pixmap
+            self.interactive_translate_area._invalidate_block_cache(s_block)                                                          
+            self.interactive_translate_area.update()                                                                         
             self.interactive_translate_area.block_modified_signal.emit(s_block) 
 
     def _connect_signals(self):
@@ -1079,7 +1077,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def _on_load_image(self):
-        if (self.translation_worker and self.translation_worker.isRunning()) or \
+        if (self.translation_worker and self.translation_worker.isRunning()) or\
            (self.batch_worker and self.batch_worker.isRunning()):
             QMessageBox.warning(self, "操作繁忙", "当前有处理任务，请等待完成后再加载。"); return
         
@@ -1166,7 +1164,7 @@ class MainWindow(QMainWindow):
                     if qpixmap_icon and not qpixmap_icon.isNull():
                         self.setWindowIcon(QIcon(qpixmap_icon)); self.current_icon_path = icon_path; applied = True
                 if not applied: raise ValueError("Pillow图标处理失败")
-            except Exception: pass # Fallback to direct Qt load
+            except Exception: pass                             
         if not applied: 
             original_icon = QIcon(icon_path)
             if not original_icon.isNull(): self.setWindowIcon(original_icon); self.current_icon_path = icon_path; applied = True
@@ -1189,7 +1187,7 @@ class MainWindow(QMainWindow):
         if dialog.exec():
             self.config_manager.save()
             self.interactive_translate_area.reload_style_configs() 
-            self.interactive_translate_area._invalidate_block_cache() # Force re-render of all blocks
+            self.interactive_translate_area._invalidate_block_cache()                                
             QMessageBox.information(self, "设置", "文本样式设置已保存。")
 
     def _handle_error_message(self, title: str, message: str, informative_text: str = "", show_settings_option: bool = False):
@@ -1210,7 +1208,7 @@ class MainWindow(QMainWindow):
         if not PILLOW_AVAILABLE: self._handle_error_message("依赖缺失", "Pillow未安装"); return
         if self.translation_worker and self.translation_worker.isRunning(): QMessageBox.information(self, "处理中", "翻译任务进行中"); return
 
-        self.interactive_translate_area.clear_all() # Clear old blocks and cache
+        self.interactive_translate_area.clear_all()                             
         if self.original_pil_for_display: 
              bg_pix = pil_to_qpixmap(self.original_pil_for_display)
              if bg_pix: self.interactive_translate_area.set_background_image(bg_pix)
@@ -1235,8 +1233,8 @@ class MainWindow(QMainWindow):
                                  processed_blocks: list | None, 
                                  original_image_path_processed: str, 
                                  error_message_str: str | None):
-        if self.current_image_path != original_image_path_processed and \
-           not (self.batch_worker and self.batch_worker.isRunning()): # Ensure this is for the current single image task
+        if self.current_image_path != original_image_path_processed and\
+           not (self.batch_worker and self.batch_worker.isRunning()):                                                   
             self._restore_ui_after_processing(); return
 
         current_bg_for_interactive = None
@@ -1266,7 +1264,7 @@ class MainWindow(QMainWindow):
         self._restore_ui_after_processing(); self.translation_worker = None 
 
     def _restore_ui_after_processing(self):
-        is_busy = bool((self.translation_worker and self.translation_worker.isRunning()) or \
+        is_busy = bool((self.translation_worker and self.translation_worker.isRunning()) or\
                        (self.batch_worker and self.batch_worker.isRunning()))
         self.translate_button.setEnabled(self.current_image_path is not None and not is_busy)
         self.load_action.setEnabled(not is_busy); self.load_batch_action.setEnabled(not is_busy)
@@ -1299,7 +1297,7 @@ class MainWindow(QMainWindow):
 
     @pyqtSlot()
     def _on_load_batch_images(self):
-        if (self.translation_worker and self.translation_worker.isRunning()) or \
+        if (self.translation_worker and self.translation_worker.isRunning()) or\
            (self.batch_worker and self.batch_worker.isRunning()):
             QMessageBox.warning(self, "操作繁忙", "当前有任务进行中。"); return
         if not PILLOW_AVAILABLE: self._handle_error_message("依赖缺失", "Pillow未安装"); return
@@ -1357,13 +1355,13 @@ class MainWindow(QMainWindow):
         if self.current_bg_image_path and os.path.exists(self.current_bg_image_path):
              bg_pixmap_resized = QPixmap(self.current_bg_image_path) 
              if not bg_pixmap_resized.isNull(): self._apply_window_background(bg_pixmap_resized)
-        if hasattr(self, 'interactive_translate_area'): # Ensure interactive area also rescales its view
+        if hasattr(self, 'interactive_translate_area'):                                                 
             self.interactive_translate_area._scale_background_and_view()
 
 
     def closeEvent(self, event):
         reply = QMessageBox.StandardButton.Yes
-        if (self.translation_worker and self.translation_worker.isRunning()) or \
+        if (self.translation_worker and self.translation_worker.isRunning()) or\
            (self.batch_worker and self.batch_worker.isRunning()):
             reply = QMessageBox.question(self, "退出确认", "有任务进行中，确定退出吗？",
                                            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -1379,4 +1377,4 @@ if __name__ == '__main__':
     main_win = MainWindow()
     main_win.show()
     sys.exit(app.exec())
-# --- END OF FILE main_window.py ---
+                                    

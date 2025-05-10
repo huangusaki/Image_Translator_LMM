@@ -1,4 +1,4 @@
-# text_style_settings_dialog.py
+                               
 import sys
 import os
 from PyQt6.QtWidgets import (

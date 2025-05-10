@@ -1,10 +1,10 @@
-# --- START OF translation_providers.py ---
+                                           
 import time
 import requests
 import threading 
 from abc import ABC, abstractmethod
 
-# --- 1. Dependency availability checks FIRST ---
+                                                 
 try:
     from openai import OpenAI, APIConnectionError, RateLimitError, APIStatusError
     OPENAI_LIB_AVAILABLE = True
@@ -23,7 +23,7 @@ except ImportError:
     genai = None 
     google = None 
 
-# --- 2. Base classes and result classes NEXT ---
+                                                 
 class TranslationResult:
     def __init__(self, original_text: str, translated_text: str, source_lang: str | None = None, target_lang: str | None = None):
         self.original_text = original_text
@@ -47,7 +47,7 @@ class TranslationProvider(ABC):
     def get_last_error(self) -> str | None:
         return self.last_error
 
-# --- 3. Derived provider classes AFTER base classes ---
+                                                        
 class LocalLLMTranslationProvider(TranslationProvider):
     def __init__(self, config_manager):
         super().__init__(config_manager)
@@ -58,7 +58,7 @@ class LocalLLMTranslationProvider(TranslationProvider):
         self._setup_client()
 
     def _setup_client(self):
-        # ... (implementation as before)
+                                        
         if not OPENAI_LIB_AVAILABLE:
             self.last_error = "OpenAI 库未安装，无法使用本地 LLM 翻译。"
             return
@@ -73,7 +73,7 @@ class LocalLLMTranslationProvider(TranslationProvider):
             self.client = None
     
     def _get_proxies(self):
-        # ... (implementation as before)
+                                        
         proxies = None
         if self.config_manager.getboolean('Proxy', 'enabled', fallback=False):
             proxy_host = self.config_manager.get('Proxy', 'host')
@@ -85,7 +85,7 @@ class LocalLLMTranslationProvider(TranslationProvider):
 
     def translate_batch(self, texts: list[str], target_language: str, source_language: str = "Japanese",
                         cancellation_event: threading.Event = None, item_progress_callback=None) -> list[TranslationResult] | None:
-        # ... (implementation as before, ensure self.last_error is handled and results are appended)
+                                                                                                    
         self.last_error = None
         if not self.client and OPENAI_LIB_AVAILABLE:
             self._setup_client()
@@ -157,13 +157,13 @@ class LocalLLMTranslationProvider(TranslationProvider):
                         translated_text_content = chat_completion.choices[0].message.content.strip()
                 
                 results.append(TranslationResult(original_text, translated_text_content, source_language, target_language))
-                # print(f"      -> '{translated_text_content[:50]}...'") # Keep this if you want detailed logging
+                                                                                                                 
 
             except (APIConnectionError, requests.exceptions.ConnectionError) as e:
                 self.last_error = f"无法连接到本地 LLM API ({self.model_name} at {self.base_url}): {e}"
                 print(f"      错误: {self.last_error}")
                 results.append(TranslationResult(original_text, f"[连接错误]", source_language, target_language))
-            # ... (other except blocks as before) ...
+                                                     
             except RateLimitError as e:
                 self.last_error = f"本地 LLM API ({self.model_name}) 速率限制: {e}"
                 print(f"      错误: {self.last_error}")
@@ -224,7 +224,7 @@ class GeminiTextTranslationProvider(TranslationProvider):
 
     def translate_batch(self, texts: list[str], target_language: str, source_language: str = "Japanese",
                         cancellation_event: threading.Event = None, item_progress_callback=None) -> list[TranslationResult] | None:
-        # ... (implementation as before, ensure self.last_error is handled and results are appended)
+                                                                                                    
         self.last_error = None
         if not self.gemini_model:
             if not GEMINI_LIB_FOR_TRANSLATION_AVAILABLE:
@@ -297,7 +297,7 @@ Translate the following {source_language} text into fluent and natural {effectiv
             except google.api_core.exceptions.DeadlineExceeded as timeout_error:
                 self.last_error = f"Gemini 文本翻译请求超时 (超过 {self.request_timeout} 秒): {timeout_error}"
                 results.append(TranslationResult(original_text, f"[Gemini翻译超时]", source_language, effective_target_language))
-            # ... (other except blocks for Gemini as before) ...
+                                                                
             except google.api_core.exceptions.GoogleAPIError as api_error:
                 self.last_error = f"Gemini 文本翻译 API 调用失败: {api_error}"
                 results.append(TranslationResult(original_text, f"[Gemini API错误]", source_language, effective_target_language))
@@ -331,13 +331,13 @@ Translate the following {source_language} text into fluent and natural {effectiv
         print(f"    Gemini 文本翻译完成。总耗时: {total_translation_time:.2f} 秒")
         return results
 
-# --- 4. Factory function at the END ---
+                                        
 def get_translation_provider(config_manager, provider_name: str, gemini_model_instance_for_text_translation=None) -> TranslationProvider | None:
     provider_name_lower = provider_name.lower()
     if "local" in provider_name_lower or "sakura" in provider_name_lower:
         return LocalLLMTranslationProvider(config_manager)
     elif "gemini" in provider_name_lower:
-        # Ensure Gemini library is available before attempting to instantiate
+                                                                             
         if not GEMINI_LIB_FOR_TRANSLATION_AVAILABLE:
             print("警告: Gemini 库不可用，无法创建 GeminiTextTranslationProvider。")
             return None
@@ -346,4 +346,4 @@ def get_translation_provider(config_manager, provider_name: str, gemini_model_in
         print(f"未知的翻译Provider名称: {provider_name}")
         return None
 
-# --- END OF translation_providers.py ---
+                                         

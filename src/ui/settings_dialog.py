@@ -1,4 +1,4 @@
-# settings_dialog.py
+                    
 import sys
 import os
 from PyQt6.QtWidgets import (
@@ -24,7 +24,7 @@ class SettingsDialog(QDialog):
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
 
-        # --- OCR Group ---
+                           
         self.ocr_group = QGroupBox("OCR 设置")
         ocr_layout = QVBoxLayout(self.ocr_group)
         self.ocr_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
@@ -38,7 +38,7 @@ class SettingsDialog(QDialog):
 
         self.fallback_ocr_group = QGroupBox("回退 OCR 设置 (仅当主要 OCR 非 Gemini 时生效)")
         self.fallback_ocr_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-        self.fallback_ocr_group.setVisible(False) # 初始化为不可见
+        self.fallback_ocr_group.setVisible(False)          
         fallback_ocr_group_layout = QVBoxLayout(self.fallback_ocr_group)
 
         fallback_ocr_provider_layout = QHBoxLayout()
@@ -50,7 +50,7 @@ class SettingsDialog(QDialog):
         fallback_ocr_group_layout.addLayout(fallback_ocr_provider_layout)
 
         self.google_ocr_widget = QWidget()
-        self.google_ocr_widget.setVisible(False) # 初始化为不可见
+        self.google_ocr_widget.setVisible(False)          
         google_ocr_layout = QHBoxLayout(self.google_ocr_widget)
         google_key_label = QLabel("Google 服务账号 JSON:")
         self.google_key_edit = QLineEdit()
@@ -59,7 +59,7 @@ class SettingsDialog(QDialog):
         fallback_ocr_group_layout.addWidget(self.google_ocr_widget)
 
         self.local_paddle_ocr_widget = QWidget()
-        self.local_paddle_ocr_widget.setVisible(False) # 初始化为不可见
+        self.local_paddle_ocr_widget.setVisible(False)          
         local_paddle_ocr_layout = QVBoxLayout(self.local_paddle_ocr_widget)
         local_paddle_ocr_info_label = QLabel("本地 PaddleOCR (日语模型)。")
         paddle_lang_layout = QHBoxLayout()
@@ -76,7 +76,7 @@ class SettingsDialog(QDialog):
         ocr_layout.addWidget(self.fallback_ocr_group)
         main_layout.addWidget(self.ocr_group)
 
-        # --- Translation Group ---
+                                   
         self.trans_group = QGroupBox("翻译设置")
         trans_layout = QVBoxLayout(self.trans_group)
         self.trans_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
@@ -90,7 +90,7 @@ class SettingsDialog(QDialog):
 
         self.fallback_trans_group = QGroupBox("回退翻译设置 (仅当主要翻译非 Gemini 或主要 OCR 非 Gemini 时生效)")
         self.fallback_trans_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
-        self.fallback_trans_group.setVisible(False) # 初始化为不可见
+        self.fallback_trans_group.setVisible(False)          
         fallback_trans_group_layout = QVBoxLayout(self.fallback_trans_group)
 
         fallback_trans_provider_layout = QHBoxLayout()
@@ -102,7 +102,7 @@ class SettingsDialog(QDialog):
         fallback_trans_group_layout.addLayout(fallback_trans_provider_layout)
 
         self.local_trans_widget = QWidget()
-        self.local_trans_widget.setVisible(False) # 初始化为不可见
+        self.local_trans_widget.setVisible(False)          
         local_trans_details_vlayout = QVBoxLayout(self.local_trans_widget)
         local_trans_details_vlayout.setContentsMargins(0,0,0,0)
         local_trans_url_layout = QHBoxLayout()
@@ -136,7 +136,7 @@ class SettingsDialog(QDialog):
         main_layout.addWidget(self.trans_group)
 
         self.gemini_group = QGroupBox("Gemini API 设置")
-        self.gemini_group.setVisible(False) # 初始化为不可见
+        self.gemini_group.setVisible(False)          
         gemini_main_layout = QVBoxLayout(self.gemini_group)
         self.gemini_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         gemini_key_layout = QHBoxLayout()
@@ -171,10 +171,10 @@ class SettingsDialog(QDialog):
         proxy_group = QGroupBox("代理设置 (主要供回退的本地 LLM API, Google Vision, 以及尝试为 Gemini 设置环境变量)")
         proxy_layout = QVBoxLayout()
         proxy_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-        self.proxy_checkbox = QCheckBox("启用代理") # Checkbox 本身是可见的
+        self.proxy_checkbox = QCheckBox("启用代理")                  
         proxy_layout.addWidget(self.proxy_checkbox)
         self.proxy_details_widget = QWidget()
-        self.proxy_details_widget.setVisible(False) # 代理详情部分，初始根据checkbox状态决定，默认checkbox未选中，所以这里也设为False
+        self.proxy_details_widget.setVisible(False)                                                     
         proxy_details_layout = QHBoxLayout(self.proxy_details_widget)
         proxy_details_layout.setContentsMargins(20,0,0,0)
         type_label = QLabel("类型: http/https")
@@ -226,18 +226,18 @@ class SettingsDialog(QDialog):
 
         proxy_enabled = self.config_manager.getboolean('Proxy', 'enabled', fallback=False)
         self.proxy_checkbox.setChecked(proxy_enabled)
-        # self.proxy_details_widget.setVisible(proxy_enabled) # 这行由 _toggle_proxy_details 控制，它会被setChecked间接调用（如果已连接信号）或由 _update_provider_sections_visibility 统一处理
-                                                            # 实际上 _toggle_proxy_details 会在信号连接后由 setChecked 触发。
-                                                            # 为了确保 _load_settings 时 proxy_details_widget 的状态正确，
-                                                            # _toggle_proxy_details 会被 proxy_checkbox.stateChanged 信号触发，
-                                                            # 或者我们也可以在 _update_provider_sections_visibility 中统一处理。
-                                                            # 当前 _toggle_proxy_details 由 stateChanged 信号触发，
-                                                            # 而 _load_settings 在 _connect_signals 之前，所以 stateChanged 不会触发。
-                                                            # 因此，在 _load_settings 之后，_update_provider_sections_visibility 会处理。
-                                                            # 或者直接在这里调用 _toggle_proxy_details。
+                                                                                                                                                                   
+                                                                                                               
+                                                                                                               
+                                                                                                                        
+                                                                                                                  
+                                                                                                           
+                                                                                                                          
+                                                                                                                              
+                                                                                              
         self.proxy_host_edit.setText(self.config_manager.get('Proxy', 'host', fallback='127.0.0.1'))
         self.proxy_port_edit.setText(self.config_manager.get('Proxy', 'port', fallback='21524'))
-        self._toggle_proxy_details(Qt.CheckState.Checked.value if proxy_enabled else Qt.CheckState.Unchecked.value) # 确保proxy_details_widget状态正确
+        self._toggle_proxy_details(Qt.CheckState.Checked.value if proxy_enabled else Qt.CheckState.Unchecked.value)                             
 
 
         self._update_provider_sections_visibility()
@@ -278,17 +278,17 @@ class SettingsDialog(QDialog):
         self.primary_ocr_combo.currentIndexChanged.connect(self._update_provider_sections_visibility)
         self.primary_trans_combo.currentIndexChanged.connect(self._update_provider_sections_visibility)
         self.fallback_ocr_provider_combo.currentIndexChanged.connect(self._update_provider_sections_visibility)
-        # No need to connect fallback_trans_provider_combo if it only has one item and its sub-widget (local_trans_widget)
-        # is handled based on the visibility of fallback_trans_group.
+                                                                                                                          
+                                                                     
 
     def _toggle_proxy_details(self, state):
-        # state can be int (from checkbox) or bool (if called directly)
+                                                                       
         is_checked = False
-        if isinstance(state, Qt.CheckState): # Should not happen with stateChanged signal directly
+        if isinstance(state, Qt.CheckState):                                                      
             is_checked = (state == Qt.CheckState.Checked)
-        elif isinstance(state, int): # from stateChanged signal
+        elif isinstance(state, int):                           
             is_checked = (state == Qt.CheckState.Checked.value)
-        elif isinstance(state, bool): # if called with a boolean
+        elif isinstance(state, bool):                           
             is_checked = state
             
         self.proxy_details_widget.setVisible(is_checked)
@@ -298,7 +298,7 @@ class SettingsDialog(QDialog):
         is_gemini_ocr_primary = (self.primary_ocr_combo.currentIndex() == 0)
         is_gemini_trans_primary = (self.primary_trans_combo.currentIndex() == 0)
 
-        # --- OCR Section ---
+                             
         show_fallback_ocr_group_flag = not is_gemini_ocr_primary
         if self.fallback_ocr_group.isVisible() != show_fallback_ocr_group_flag:
             self.fallback_ocr_group.setVisible(show_fallback_ocr_group_flag)
@@ -309,32 +309,32 @@ class SettingsDialog(QDialog):
                 self.google_ocr_widget.setVisible(is_google_selected_for_fallback_ocr)
             if self.local_paddle_ocr_widget.isVisible() == is_google_selected_for_fallback_ocr:
                 self.local_paddle_ocr_widget.setVisible(not is_google_selected_for_fallback_ocr)
-        else: # Fallback OCR group is hidden, so its children must also be hidden
+        else:                                                                    
             self.google_ocr_widget.setVisible(False)
             self.local_paddle_ocr_widget.setVisible(False)
 
-        # --- Translation Section ---
+                                     
         show_fallback_trans_group_flag = (not is_gemini_trans_primary) or (not is_gemini_ocr_primary)
         if self.fallback_trans_group.isVisible() != show_fallback_trans_group_flag:
             self.fallback_trans_group.setVisible(show_fallback_trans_group_flag)
 
         if show_fallback_trans_group_flag:
-            should_show_local_trans_widget_now = (self.fallback_trans_provider_combo.currentIndex() == 0) # Assuming index 0 is always "本地 LLM API (Sakura)"
+            should_show_local_trans_widget_now = (self.fallback_trans_provider_combo.currentIndex() == 0)                                                   
             if self.local_trans_widget.isVisible() != should_show_local_trans_widget_now:
                  self.local_trans_widget.setVisible(should_show_local_trans_widget_now)
-        else: # Fallback Translation group is hidden, so its children must also be hidden
+        else:                                                                            
             self.local_trans_widget.setVisible(False)
 
 
-        # --- Gemini API Settings Section ---
+                                             
         show_gemini_api_settings_group_flag = is_gemini_ocr_primary or is_gemini_trans_primary
         if self.gemini_group.isVisible() != show_gemini_api_settings_group_flag:
             self.gemini_group.setVisible(show_gemini_api_settings_group_flag)
 
-        # --- Proxy Details Widget ---
-        # This is controlled by the checkbox, which is handled by _toggle_proxy_details
-        # No need to duplicate logic here if _toggle_proxy_details is correctly called or its state reflected.
-        # self._toggle_proxy_details(self.proxy_checkbox.isChecked()) # Ensures it's up-to-date
+                                      
+                                                                                       
+                                                                                                              
+                                                                                               
 
         QApplication.processEvents()
         self.layout().activate()
@@ -361,22 +361,22 @@ class SettingsDialog(QDialog):
                 QMessageBox.warning(self, "输入错误", "已选择 Gemini 作为Provider，但未填写 Gemini 目标翻译语言。"); self.gemini_target_lang_edit.setFocus(); return
 
         gemini_timeout_str = self.gemini_timeout_edit.text()
-        if gemini_timeout_str and (not gemini_timeout_str.isdigit() or int(gemini_timeout_str) <= 0) : # Allow empty
-             if gemini_timeout_str: # only warn if not empty and invalid
+        if gemini_timeout_str and (not gemini_timeout_str.isdigit() or int(gemini_timeout_str) <= 0) :              
+             if gemini_timeout_str:                                     
                 QMessageBox.warning(self, "输入错误", "Gemini 请求超时必须是一个正整数。"); self.gemini_timeout_edit.setFocus(); return
         
         local_llm_timeout_str = self.local_llm_timeout_edit.text()
-        if local_llm_timeout_str and (not local_llm_timeout_str.isdigit() or int(local_llm_timeout_str) <= 0): # Allow empty
-            if local_llm_timeout_str: # only warn if not empty and invalid
+        if local_llm_timeout_str and (not local_llm_timeout_str.isdigit() or int(local_llm_timeout_str) <= 0):              
+            if local_llm_timeout_str:                                     
                 QMessageBox.warning(self, "输入错误", "本地LLM 请求超时必须是一个正整数。"); self.local_llm_timeout_edit.setFocus(); return
 
 
         if self.fallback_trans_group.isVisible() and self.local_trans_widget.isVisible() and not self.local_target_lang_edit.text():
              QMessageBox.warning(self, "输入错误", "请输入本地LLM的目标翻译语言。"); self.local_target_lang_edit.setFocus(); return
 
-        if self.primary_trans_combo.currentIndex() == 1 and \
-           self.fallback_trans_group.isVisible() and \
-           self.local_trans_widget.isVisible() and \
+        if self.primary_trans_combo.currentIndex() == 1 and\
+           self.fallback_trans_group.isVisible() and\
+           self.local_trans_widget.isVisible() and\
            not self.local_trans_url_edit.text():
             QMessageBox.warning(self, "输入提示", "未填写本地翻译 API 地址。\n如果 Gemini API 不可用或未配置，且选择使用回退翻译，则无法进行翻译。")
 
@@ -412,11 +412,11 @@ if __name__ == '__main__':
 
     app = QApplication(sys.argv)
 
-    # Ensure a dummy config exists for testing if it doesn't
+                                                            
     if not os.path.exists('config.ini'):
         print("Creating dummy config.ini for testing.")
         dummy_cfg_writer = DummyCM('config.ini')
-        # Set some defaults to ensure Gemini is primary to test the hiding logic
+                                                                                
         dummy_cfg_writer.set('API', 'ocr_provider', 'gemini')
         dummy_cfg_writer.set('API', 'translation_provider', 'gemini')
         dummy_cfg_writer.save()

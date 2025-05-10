@@ -12,7 +12,7 @@ class GlossarySettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("术语表设置 (本地LLM)")
         self.config_manager = config_manager
-        self.glossary_terms = [] # (source, target, original_line)
+        self.glossary_terms = []                                  
         self.setMinimumWidth(550)
         self._init_ui()
         self._load_glossary_from_config()
@@ -21,10 +21,10 @@ class GlossarySettingsDialog(QDialog):
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
 
-        glossary_group = QGroupBox("术语表管理") # Main group for this dialog
+        glossary_group = QGroupBox("术语表管理")                             
         glossary_group_layout = QVBoxLayout(glossary_group)
 
-        # 1. Single term addition
+                                 
         glossary_add_term_layout = QHBoxLayout()
         self.glossary_source_term_edit = QLineEdit()
         self.glossary_source_term_edit.setPlaceholderText("待翻译译文的术语")
@@ -37,9 +37,9 @@ class GlossarySettingsDialog(QDialog):
         glossary_add_term_layout.addWidget(self.glossary_add_term_button, 1)
         glossary_group_layout.addLayout(glossary_add_term_layout)
 
-        # 2. List display
+                         
         self.glossary_list_widget = QListWidget()
-        self.glossary_list_widget.setMinimumHeight(150) # Give it more space
+        self.glossary_list_widget.setMinimumHeight(150)                     
         glossary_group_layout.addWidget(self.glossary_list_widget)
 
         glossary_list_actions_layout = QHBoxLayout()
@@ -48,7 +48,7 @@ class GlossarySettingsDialog(QDialog):
         glossary_list_actions_layout.addWidget(self.glossary_delete_selected_button)
         glossary_group_layout.addLayout(glossary_list_actions_layout)
         
-        # 3. Bulk operations area
+                                 
         self.glossary_bulk_text_edit = QTextEdit()
         self.glossary_bulk_text_edit.setPlaceholderText("批量导入术语表 (每行格式: 原文->译文[ #可选注释])\n例如:\nリエル->莉艾露\n周->周 # 角色名")
         self.glossary_bulk_text_edit.setMinimumHeight(100)
@@ -61,7 +61,7 @@ class GlossarySettingsDialog(QDialog):
         glossary_bulk_actions_layout.addWidget(self.glossary_populate_text_from_list_button)
         glossary_group_layout.addLayout(glossary_bulk_actions_layout)
 
-        # 4. File import/export buttons
+                                       
         glossary_file_actions_layout = QHBoxLayout()
         self.glossary_import_file_button = QPushButton("导入文件")
         self.glossary_export_file_button = QPushButton("导出文件")
@@ -72,7 +72,7 @@ class GlossarySettingsDialog(QDialog):
         
         main_layout.addWidget(glossary_group)
 
-        # Dialog Buttons
+                        
         button_layout = QHBoxLayout()
         button_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         self.save_button = QPushButton("保存"); self.cancel_button = QPushButton("取消")
@@ -184,7 +184,7 @@ class GlossarySettingsDialog(QDialog):
                                          QMessageBox.StandardButton.Cancel)
             if reply == QMessageBox.StandardButton.Cancel:
                 return
-            if reply == QMessageBox.StandardButton.No: # Replace
+            if reply == QMessageBox.StandardButton.No:          
                 self.glossary_terms.clear()
             newly_parsed_terms_count = 0
             existing_sources = {s for s, _, _ in self.glossary_terms}
