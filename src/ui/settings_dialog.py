@@ -135,6 +135,16 @@ class SettingsDialog (QDialog ):
         gemini_model_layout .addWidget (gemini_model_label );gemini_model_layout .addWidget (self .gemini_model_edit ,1 )
         gemini_main_layout .addLayout (gemini_model_layout )
         gemini_target_lang_layout =QHBoxLayout ()
+        gemini_base_url_layout = QHBoxLayout()
+        gemini_base_url_label = QLabel("Gemini Base URL (可选):")
+        self.gemini_base_url_edit = QLineEdit()
+        self.gemini_base_url_edit.setPlaceholderText("例如: https://generativelanguage.googleapis.com/v1beta/openai/")
+        self.gemini_base_url_edit.setToolTip(
+            "如果留空，将使用官方默认的 Gemini API 地址"
+        )
+        gemini_base_url_layout.addWidget(gemini_base_url_label)
+        gemini_base_url_layout.addWidget(self.gemini_base_url_edit, 1)
+        gemini_main_layout.addLayout(gemini_base_url_layout)
         gemini_target_lang_label =QLabel ("Gemini 目标翻译语言:")
         self .gemini_target_lang_edit =QLineEdit ()
         self .gemini_target_lang_edit .setPlaceholderText ("例如: Chinese, English")
@@ -185,6 +195,7 @@ class SettingsDialog (QDialog ):
         self .fallback_trans_provider_combo .setCurrentIndex (0 )
         self .gemini_api_key_edit .setText (self .config_manager .get ('GeminiAPI','api_key',fallback =''))
         self .gemini_model_edit .setText (self .config_manager .get ('GeminiAPI','model_name',fallback ='gemini-1.5-flash-latest'))
+        self .gemini_base_url_edit.setText(self.config_manager.get('GeminiAPI', 'gemini_base_url', fallback=''))
         self .gemini_timeout_edit .setText (self .config_manager .get ('GeminiAPI','request_timeout',fallback ='60'))
         self .gemini_target_lang_edit .setText (self .config_manager .get ('GeminiAPI','target_language',fallback ='Chinese'))
         self .google_key_edit .setText (self .config_manager .get ('GoogleAPI','service_account_json',fallback =''))
@@ -209,6 +220,7 @@ class SettingsDialog (QDialog ):
         self .config_manager .set ('GeminiAPI','api_key',self .gemini_api_key_edit .text ())
         self .config_manager .set ('GeminiAPI','model_name',self .gemini_model_edit .text ())
         self .config_manager .set ('GeminiAPI','request_timeout',self .gemini_timeout_edit .text ())
+        self .config_manager .set('GeminiAPI', 'gemini_base_url', self.gemini_base_url_edit.text().strip())
         self .config_manager .set ('GeminiAPI','target_language',self .gemini_target_lang_edit .text ())
         self .config_manager .set ('GoogleAPI','service_account_json',self .google_key_edit .text ())
         self .config_manager .set ('LocalOcrAPI','paddle_lang',self .paddle_lang_combo .currentText ())
@@ -291,6 +303,11 @@ class SettingsDialog (QDialog ):
              if gemini_timeout_str :
                 QMessageBox .warning (self ,"输入错误","Gemini 请求超时必须是一个正整数。");self .gemini_timeout_edit .setFocus ();return 
         local_llm_timeout_str =self .local_llm_timeout_edit .text ()
+        gemini_base_url_str = self.gemini_base_url_edit.text().strip()
+        if gemini_base_url_str and not (gemini_base_url_str.startswith("http://") or gemini_base_url_str.startswith("https://")):
+            QMessageBox.warning(self, "输入错误", "Gemini Base URL 如果填写，必须以 http:// 或 https:// 开头。")
+            self.gemini_base_url_edit.setFocus()
+            return
         if local_llm_timeout_str and (not local_llm_timeout_str .isdigit ()or int (local_llm_timeout_str )<=0 ):
             if local_llm_timeout_str :
                 QMessageBox .warning (self ,"输入错误","本地LLM 请求超时必须是一个正整数。");self .local_llm_timeout_edit .setFocus ();return 

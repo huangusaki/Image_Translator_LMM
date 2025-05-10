@@ -43,6 +43,7 @@ DEFAULT_CONFIG ={
 'GeminiAPI':{
 'api_key':'',
 'model_name':'gemini-1.5-flash-latest',
+'gemini_base_url': '',
 'request_timeout':'60',
 'target_language':'Chinese',
 },

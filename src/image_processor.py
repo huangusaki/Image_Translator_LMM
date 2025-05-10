@@ -97,11 +97,18 @@ class ImageProcessor :
         if not api_key :
             self .last_error ="Gemini API 密钥 (用于 OpenAI 兼容模式) 未在配置中找到。"
             return False 
+        gemini_base_url_config = self.config_manager.get('GeminiAPI', 'gemini_base_url', fallback='').strip()
+        actual_base_url_for_gemini = "https://generativelanguage.googleapis.com/v1beta/openai/" # 默认官方地址
+
+        if gemini_base_url_config:
+            actual_base_url_for_gemini = gemini_base_url_config
+            if not actual_base_url_for_gemini.endswith('/'):
+                actual_base_url_for_gemini += '/'
         try :
             if self .openai_client is None :
                 self .openai_client =OpenAI (
                 api_key =api_key ,
-                base_url ="https://generativelanguage.googleapis.com/v1beta/openai/"
+                base_url =actual_base_url_for_gemini
                 )
             return True 
         except Exception as e :
@@ -312,7 +319,7 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                         messages =messages_payload ,
                         timeout =float (request_timeout_seconds ),
                         reasoning_effort ="high",
-                        temperature =0.9 
+                        temperature = 1.0 
                         )
                         raw_response_text =""
                         if response .choices and response .choices [0 ].message and response .choices [0 ].message .content :
