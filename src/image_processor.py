@@ -29,7 +29,7 @@ class ProcessedBlock:
                  font_size_pixels: int = 22,
                  angle: float = 0.0,
                  id: str | int | None = None,
-                 text_align: str = "left"
+                 text_align: str | None = None  # 修改: 默认值改为 None
                  ):
         self.id = id if id is not None else str(time.time_ns())
         self.original_text = original_text
@@ -49,13 +49,21 @@ class ProcessedBlock:
 
         self.font_size_pixels = font_size_pixels
         self.angle = angle
-        self.text_align = text_align
+        
+        # 修改: 根据 orientation 设置默认的 text_align
+        if text_align is None:
+            if self.orientation != "horizontal":  
+                self.text_align = "right"
+            else: 
+                self.text_align = "left"  
+        else:
+            self.text_align = text_align
 
 
     def __repr__(self):
         return (f"ProcessedBlock(id='{self.id}', original='{self.original_text[:10]}...', translated='{self.translated_text[:10]}...', "
                 f"bbox={self.bbox}, orientation='{self.orientation}', font_size_category='{self.font_size_category}', "
-                f"font_px={self.font_size_pixels}, angle={self.angle})")
+                f"font_px={self.font_size_pixels}, angle={self.angle}, text_align='{self.text_align}')") # 添加 text_align 到 repr
 
 class ImageProcessor:
     def __init__(self, config_manager: ConfigManager):
@@ -540,7 +548,7 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                 font_size_category=font_size_cat,
                 font_size_pixels=font_size_px,
                 angle=0.0,
-                text_align=iblock_data.get("text_align", "left")
+                text_align=iblock_data.get("text_align", None)
             )
 
             if self.config_manager.getboolean('UI', 'auto_adjust_bbox_to_fit_text', fallback=True) and PILLOW_AVAILABLE:

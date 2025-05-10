@@ -664,28 +664,12 @@ def _render_single_block_pil_for_preview(
             this_col_content_actual_height = 0
             if not is_manual_break_col:
                 this_col_content_actual_height = len(col_text) * seg_secondary_dim_with_spacing
-                                                                                      
-
-            col_vert_offset = 0
-            if block.text_align == "center":                                                                              
-                col_vert_offset = (max_content_height_for_wrapping - this_col_content_actual_height) / 2.0
-            elif block.text_align == "right":                                                                            
-                col_vert_offset = max_content_height_for_wrapping - this_col_content_actual_height
-            current_y_pil_char += col_vert_offset
-
 
             if not is_manual_break_col:
                 for char_in_col_idx, char_in_col in enumerate(col_text):
-                    char_w_specific_pil = pil_draw_metric.textlength(char_in_col, font=pil_font)
-                    
-                                                                                                                          
-                                                                                                                 
-                                                                                                             
-                                                                                                                  
-                                                     
+                    char_w_specific_pil = pil_draw_metric.textlength(char_in_col, font=pil_font)                         
                     char_x_offset_in_col_slot = (single_col_visual_width_metric - char_w_specific_pil) / 2.0
                     final_char_draw_x = current_x_pil_col_start_abs + char_x_offset_in_col_slot
-
                     if outline_thickness > 0 and text_outline_color_pil and len(text_outline_color_pil) == 4 and text_outline_color_pil[3] > 0:
                         for dx_o in range(-outline_thickness, outline_thickness + 1):
                             for dy_o in range(-outline_thickness, outline_thickness + 1):
@@ -704,7 +688,6 @@ def _render_single_block_pil_for_preview(
                     current_x_pil_col_start_abs -= spacing_to_next_col
                 else:               
                     current_x_pil_col_start_abs += spacing_to_next_col
-    
     return block_surface
 
 
@@ -821,15 +804,14 @@ def _draw_single_block_pil(
 
 def draw_processed_blocks_pil(pil_image_original: Image.Image, processed_blocks: list, config_manager: ConfigManager) -> Image.Image | None:
     if not PILLOW_AVAILABLE or not pil_image_original or not processed_blocks:
-        return pil_image_original                                                      
+        return pil_image_original
 
     try:
         if pil_image_original.mode != 'RGBA':
             base_image = pil_image_original.convert('RGBA')
         else:
-            base_image = pil_image_original.copy()                 
+            base_image = pil_image_original.copy()
 
-                                                                          
         font_name_conf = config_manager.get('UI', 'font_name', 'msyh.ttc')
         text_pad_conf = config_manager.getint('UI', 'text_padding', 3)
 
@@ -846,7 +828,6 @@ def draw_processed_blocks_pil(pil_image_original: Image.Image, processed_blocks:
         h_manual_break_extra_conf = config_manager.getint('UI', 'h_manual_break_extra_spacing_px', 0)
         v_manual_break_extra_conf = config_manager.getint('UI', 'v_manual_break_extra_spacing_px', 0)
 
-                      
         try:
             mc_parts = list(map(int, main_color_str.split(',')))
             oc_parts = list(map(int, outline_color_str.split(',')))
@@ -854,29 +835,36 @@ def draw_processed_blocks_pil(pil_image_original: Image.Image, processed_blocks:
             main_color_pil = tuple(mc_parts) if len(mc_parts) in [3,4] else (255,255,255,255)
             outline_color_pil = tuple(oc_parts) if len(oc_parts) in [3,4] else (0,0,0,255)
             bg_color_pil = tuple(bc_parts) if len(bc_parts) in [3,4] else (0,0,0,128)
-                                        
             if len(main_color_pil) == 3: main_color_pil += (255,)
             if len(outline_color_pil) == 3: outline_color_pil += (255,)
-            if len(bg_color_pil) == 3: bg_color_pil += (128,)                                        
-        except ValueError:                                        
+            if len(bg_color_pil) == 3: bg_color_pil += (128,)
+        except ValueError:
             main_color_pil=(255,255,255,255); outline_color_pil=(0,0,0,255); bg_color_pil=(0,0,0,128)
 
         for idx, block_item in enumerate(processed_blocks): 
-                                            
             if not hasattr(block_item, 'translated_text') or not block_item.translated_text or not block_item.translated_text.strip():
                 continue
             if not hasattr(block_item, 'font_size_pixels') or not hasattr(block_item, 'bbox'):
                 print(f"Skipping block {idx} due to missing attributes (font_size_pixels or bbox).")
                 continue
-            if not hasattr(block_item, 'orientation'):                                 
+            if not hasattr(block_item, 'orientation'):
                 block_item.orientation = "horizontal"
-            if not hasattr(block_item, 'text_align'):                               
-                block_item.text_align = "center" if block_item.orientation == "horizontal" else "left"                                                        
-            if not hasattr(block_item, 'angle'):                           
+            
+            # 修改: 确保 text_align 属性存在，并为竖排设置 "right" 作为后备默认值
+            if not hasattr(block_item, 'text_align') or not block_item.text_align: # 也检查 block_item.text_align 是否为空
+                # 这个分支理论上在 ProcessedBlock.__init__ 修改后不应频繁触发
+                # 但作为安全措施保留，并与 ProcessedBlock 行为一致
+                if block_item.orientation != "horizontal": # 即竖排
+                    block_item.text_align = "right"
+                else: # 横排
+                    block_item.text_align = "left" # 或 "center"
+                print(f"警告(draw_processed_blocks_pil): Block {getattr(block_item, 'id', 'N/A')} 缺少有效的 text_align，已设置为 '{block_item.text_align}'。")
+
+            if not hasattr(block_item, 'angle'):
                 block_item.angle = 0.0
 
             _draw_single_block_pil(
-                draw_target_image=base_image,                                   
+                draw_target_image=base_image,
                 block=block_item, 
                 font_name_config=font_name_conf,
                 text_main_color_pil=main_color_pil,
@@ -897,5 +885,5 @@ def draw_processed_blocks_pil(pil_image_original: Image.Image, processed_blocks:
         print(f"错误(draw_processed_blocks_pil): {e}")
         import traceback
         traceback.print_exc()
-        return pil_image_original                           
+        return pil_image_original         
                               
