@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QListWidget, QListWidgetItem, QMessageBox, QTextEdit
 )
 from PyQt6.QtCore import Qt, pyqtSlot
-
 class GlossarySettingsDialog(QDialog):
     def __init__(self, config_manager, parent=None):
         super().__init__(parent)
@@ -17,14 +16,10 @@ class GlossarySettingsDialog(QDialog):
         self._init_ui()
         self._load_glossary_from_config()
         self._connect_signals()
-
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
-
         glossary_group = QGroupBox("术语表管理")                             
         glossary_group_layout = QVBoxLayout(glossary_group)
-
-                                 
         glossary_add_term_layout = QHBoxLayout()
         self.glossary_source_term_edit = QLineEdit()
         self.glossary_source_term_edit.setPlaceholderText("待翻译译文的术语")
@@ -36,32 +31,24 @@ class GlossarySettingsDialog(QDialog):
         glossary_add_term_layout.addWidget(self.glossary_target_term_edit, 2)
         glossary_add_term_layout.addWidget(self.glossary_add_term_button, 1)
         glossary_group_layout.addLayout(glossary_add_term_layout)
-
-                         
         self.glossary_list_widget = QListWidget()
         self.glossary_list_widget.setMinimumHeight(150)                     
         glossary_group_layout.addWidget(self.glossary_list_widget)
-
         glossary_list_actions_layout = QHBoxLayout()
         self.glossary_delete_selected_button = QPushButton("删除选中")
         glossary_list_actions_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         glossary_list_actions_layout.addWidget(self.glossary_delete_selected_button)
         glossary_group_layout.addLayout(glossary_list_actions_layout)
-        
-                                 
         self.glossary_bulk_text_edit = QTextEdit()
         self.glossary_bulk_text_edit.setPlaceholderText("批量导入术语表 (每行格式: 原文->译文[ #可选注释])\n例如:\nリエル->莉艾露\n周->周 # 角色名")
         self.glossary_bulk_text_edit.setMinimumHeight(100)
         glossary_group_layout.addWidget(self.glossary_bulk_text_edit)
-
         glossary_bulk_actions_layout = QHBoxLayout()
         self.glossary_parse_from_text_button = QPushButton("从文本区加载到列表")
         self.glossary_populate_text_from_list_button = QPushButton("从列表填充到文本区")
         glossary_bulk_actions_layout.addWidget(self.glossary_parse_from_text_button)
         glossary_bulk_actions_layout.addWidget(self.glossary_populate_text_from_list_button)
         glossary_group_layout.addLayout(glossary_bulk_actions_layout)
-
-                                       
         glossary_file_actions_layout = QHBoxLayout()
         self.glossary_import_file_button = QPushButton("导入文件")
         self.glossary_export_file_button = QPushButton("导出文件")
@@ -69,16 +56,12 @@ class GlossarySettingsDialog(QDialog):
         glossary_file_actions_layout.addWidget(self.glossary_import_file_button)
         glossary_file_actions_layout.addWidget(self.glossary_export_file_button)
         glossary_group_layout.addLayout(glossary_file_actions_layout)
-        
         main_layout.addWidget(glossary_group)
-
-                        
         button_layout = QHBoxLayout()
         button_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         self.save_button = QPushButton("保存"); self.cancel_button = QPushButton("取消")
         button_layout.addWidget(self.save_button); button_layout.addWidget(self.cancel_button)
         main_layout.addLayout(button_layout)
-
     def _parse_glossary_line(self, line: str) -> tuple[str, str, str] | None:
         line = line.strip()
         if not line or "->" not in line:
@@ -90,7 +73,6 @@ class GlossarySettingsDialog(QDialog):
         if source and target:
             return source, target, line
         return None
-
     def _load_glossary_from_config(self):
         self.glossary_terms.clear()
         self.glossary_list_widget.clear()
@@ -98,7 +80,6 @@ class GlossarySettingsDialog(QDialog):
         raw_glossary_text = self.config_manager.get('LocalTranslationAPI', 'glossary_text', fallback='')
         self.glossary_bulk_text_edit.setPlainText(raw_glossary_text)
         self._parse_and_load_from_bulk_text()
-
     def _parse_and_load_from_bulk_text(self):
         self.glossary_terms.clear()
         self.glossary_list_widget.clear()
@@ -112,7 +93,6 @@ class GlossarySettingsDialog(QDialog):
                 item = QListWidgetItem(display_text)
                 item.setData(Qt.ItemDataRole.UserRole, len(self.glossary_terms) - 1) 
                 self.glossary_list_widget.addItem(item)
-
     def _populate_bulk_text_from_list(self):
         all_lines = []
         for source, target, original_line in self.glossary_terms:
@@ -121,7 +101,6 @@ class GlossarySettingsDialog(QDialog):
             else:
                  all_lines.append(f"{source}->{target}")
         self.glossary_bulk_text_edit.setPlainText("\n".join(all_lines))
-
     def _add_glossary_term(self):
         source = self.glossary_source_term_edit.text().strip()
         target = self.glossary_target_term_edit.text().strip()
@@ -141,7 +120,6 @@ class GlossarySettingsDialog(QDialog):
         self.glossary_source_term_edit.clear()
         self.glossary_target_term_edit.clear()
         self.glossary_source_term_edit.setFocus()
-
     def _delete_selected_glossary_term(self):
         selected_items = self.glossary_list_widget.selectedItems()
         if not selected_items:
@@ -160,7 +138,6 @@ class GlossarySettingsDialog(QDialog):
             if 0 <= idx_in_terms < len(self.glossary_terms):
                 del self.glossary_terms[idx_in_terms]
         self._rebuild_list_widget_from_terms()
-
     def _rebuild_list_widget_from_terms(self):
         self.glossary_list_widget.clear()
         for i, (source, target, _) in enumerate(self.glossary_terms):
@@ -168,7 +145,6 @@ class GlossarySettingsDialog(QDialog):
             item = QListWidgetItem(display_text)
             item.setData(Qt.ItemDataRole.UserRole, i)
             self.glossary_list_widget.addItem(item)
-
     def _import_glossary_from_file(self):
         start_dir = self.config_manager.get('UI', 'last_glossary_dir', os.path.expanduser("~"))
         file_path, _ = QFileDialog.getOpenFileName(self, "导入术语文件", start_dir, 
@@ -202,7 +178,6 @@ class GlossarySettingsDialog(QDialog):
             QMessageBox.information(self, "导入完成", f"成功从文件导入/合并了 {newly_parsed_terms_count} 条新术语。\n总术语数: {len(self.glossary_terms)}")
         except Exception as e:
             QMessageBox.critical(self, "导入失败", f"读取或解析文件时发生错误: {e}")
-
     def _export_glossary_to_file(self):
         if not self.glossary_terms:
             QMessageBox.information(self, "提示", "术语表为空，无需导出。")
@@ -226,7 +201,6 @@ class GlossarySettingsDialog(QDialog):
             QMessageBox.information(self, "导出成功", f"术语表已成功导出到: {file_path}")
         except Exception as e:
             QMessageBox.critical(self, "导出失败", f"保存文件时发生错误: {e}")
-
     def _connect_signals(self):
         self.save_button.clicked.connect(self.on_save)
         self.cancel_button.clicked.connect(self.reject)
@@ -236,7 +210,6 @@ class GlossarySettingsDialog(QDialog):
         self.glossary_populate_text_from_list_button.clicked.connect(self._populate_bulk_text_from_list)
         self.glossary_import_file_button.clicked.connect(self._import_glossary_from_file)
         self.glossary_export_file_button.clicked.connect(self._export_glossary_to_file)
-
     def _save_glossary_to_config(self):
         all_lines = []
         for source, target, original_line in self.glossary_terms:
@@ -245,7 +218,6 @@ class GlossarySettingsDialog(QDialog):
             else:
                  all_lines.append(f"{source}->{target}")
         self.config_manager.set('LocalTranslationAPI', 'glossary_text', "\n".join(all_lines))
-
     @pyqtSlot()
     def on_save(self):
         self._save_glossary_to_config()

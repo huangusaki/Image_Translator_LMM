@@ -1,10 +1,6 @@
-                                         
-
 import configparser
 import os
-
 CONFIG_FILE = 'config.ini'
-
 DEFAULT_CONFIG = {
     'UI': {
         'background_image_path': '',
@@ -70,13 +66,11 @@ DEFAULT_CONFIG = {
         'port': '21524',                           
     }
 }
-
 class ConfigManager:
     def __init__(self, config_path=CONFIG_FILE):
         self.config_path = config_path
         self.config = configparser.ConfigParser(interpolation=None)                                           
         self._load_or_create_config()
-
     def _load_or_create_config(self):
         if not os.path.exists(self.config_path):
             print(f"配置文件 '{self.config_path}' 不存在，将使用默认值创建。")
@@ -98,8 +92,6 @@ class ConfigManager:
                         self.config.add_section(section)
                     for option, value in options.items():
                         self.config.set(section, option, str(value))
-
-
     def _ensure_config_integrity(self):
         needs_update = False
         for section, default_options in DEFAULT_CONFIG.items():
@@ -107,32 +99,20 @@ class ConfigManager:
                 self.config.add_section(section)
                 needs_update = True
                 print(f"配置文件缺少节 '[{section}]', 已添加。")
-            
             current_options_in_section = set(self.config.options(section)) if self.config.has_section(section) else set()
-
             for option, default_value in default_options.items():
                 if not self.config.has_option(section, option):
                     self.config.set(section, option, str(default_value))
                     needs_update = True
                     print(f"配置文件缺少选项 '{option}' 在节 '[{section}]' 下, 已添加默认值 '{default_value}'。")
-            
-                                                                                          
-                                                                
-                                                            
-                                                                                          
-                                                                                                    
-                                           
-
         if needs_update:
             self._save_config_to_file()
-
     def _save_config_to_file(self):
         try:
             with open(self.config_path, 'w', encoding='utf-8') as configfile:
                 self.config.write(configfile)
         except Exception as e:
             print(f"保存配置文件 '{self.config_path}' 时出错: {e}")
-
     def get(self, section, option, fallback=None):
         try:
             return self.config.get(section, option)
@@ -140,7 +120,6 @@ class ConfigManager:
             if fallback is None and section in DEFAULT_CONFIG and option in DEFAULT_CONFIG[section]:
                 return str(DEFAULT_CONFIG[section][option])
             return fallback
-
     def getboolean(self, section, option, fallback=False):
         try:
             return self.config.getboolean(section, option)
@@ -150,14 +129,10 @@ class ConfigManager:
                  return val_str in ('true', 'yes', '1', 'on')                            
             return fallback                                     
         except ValueError:
-                                                                                 
-                                                                                  
             if section in DEFAULT_CONFIG and option in DEFAULT_CONFIG[section]:
                  val_str = str(DEFAULT_CONFIG[section][option]).lower()
                  return val_str in ('true', 'yes', '1', 'on')
             return fallback
-
-
     def getint(self, section, option, fallback=0):
         try:
             return self.config.getint(section, option)
@@ -169,14 +144,12 @@ class ConfigManager:
                     return fallback                            
             return fallback                            
         except ValueError:
-                                                                                
             if section in DEFAULT_CONFIG and option in DEFAULT_CONFIG[section]:
                 try:
                     return int(DEFAULT_CONFIG[section][option])
                 except (ValueError, TypeError):
                     return fallback
             return fallback
-
     def getfloat(self, section, option, fallback=0.0):                 
         try:
             return self.config.getfloat(section, option)
@@ -188,23 +161,17 @@ class ConfigManager:
                     return fallback                            
             return fallback                            
         except ValueError:
-                                                                                 
             if section in DEFAULT_CONFIG and option in DEFAULT_CONFIG[section]:
                 try:
                     return float(DEFAULT_CONFIG[section][option])
                 except (ValueError, TypeError):
                     return fallback
             return fallback
-
     def set(self, section, option, value):
         if not self.config.has_section(section):
             self.config.add_section(section)
         self.config.set(section, option, str(value))
-
     def save(self):
         self._save_config_to_file()
-
     def get_raw_config_parser(self):            
         return self.config
-
-                                       

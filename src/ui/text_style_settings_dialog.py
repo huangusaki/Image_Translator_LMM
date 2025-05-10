@@ -1,4 +1,3 @@
-                               
 import sys
 import os
 from PyQt6.QtWidgets import (
@@ -7,7 +6,6 @@ from PyQt6.QtWidgets import (
     QSizePolicy, QMessageBox
 )
 from PyQt6.QtCore import Qt, pyqtSlot
-
 class TextStyleSettingsDialog(QDialog):
     def __init__(self, config_manager, parent=None):
         super().__init__(parent)
@@ -17,21 +15,16 @@ class TextStyleSettingsDialog(QDialog):
         self._init_ui()
         self._load_settings()
         self._connect_signals()
-
     def _init_ui(self):
         main_layout = QVBoxLayout(self)
-
         text_style_group = QGroupBox("文本样式")
         text_style_layout = QVBoxLayout(text_style_group)
         text_style_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
-
-
         font_name_layout = QHBoxLayout()
         font_name_label = QLabel("字体名称/路径:")
         self.font_name_edit = QLineEdit()
         font_name_layout.addWidget(font_name_label); font_name_layout.addWidget(self.font_name_edit, 1)
         text_style_layout.addLayout(font_name_layout)
-
         fixed_font_size_layout = QHBoxLayout()
         fixed_font_size_label = QLabel("固定字体大小 (0 则动态):")
         self.fixed_font_size_edit = QLineEdit()
@@ -39,7 +32,6 @@ class TextStyleSettingsDialog(QDialog):
         self.fixed_font_size_edit.setToolTip("设置一个固定的字体大小。如果为0或空，则使用LLM建议的类别映射。")
         fixed_font_size_layout.addWidget(fixed_font_size_label); fixed_font_size_layout.addWidget(self.fixed_font_size_edit, 0)
         text_style_layout.addLayout(fixed_font_size_layout)
-        
         h_text_spacing_group = QGroupBox("横排文本间距")
         h_text_spacing_layout = QVBoxLayout(h_text_spacing_group)
         h_char_spacing_layout = QHBoxLayout()
@@ -57,7 +49,6 @@ class TextStyleSettingsDialog(QDialog):
         h_line_spacing_layout.addWidget(self.h_text_line_spacing_edit, 0)
         h_text_spacing_layout.addLayout(h_line_spacing_layout)
         text_style_layout.addWidget(h_text_spacing_group)
-
         v_text_spacing_group = QGroupBox("竖排文本间距")
         v_text_spacing_layout = QVBoxLayout(v_text_spacing_group)
         v_column_spacing_layout = QHBoxLayout()
@@ -75,10 +66,8 @@ class TextStyleSettingsDialog(QDialog):
         v_char_spacing_layout.addWidget(self.v_text_char_spacing_edit, 0)
         v_text_spacing_layout.addLayout(v_char_spacing_layout)
         text_style_layout.addWidget(v_text_spacing_group)
-
         manual_break_spacing_group = QGroupBox("手动换行/换列额外间距")
         manual_break_spacing_layout = QVBoxLayout(manual_break_spacing_group)
-        
         h_manual_break_layout = QHBoxLayout()
         h_manual_break_label = QLabel("横排手动换行额外间距 (像素):")
         self.h_manual_break_extra_spacing_edit = QLineEdit()
@@ -86,7 +75,6 @@ class TextStyleSettingsDialog(QDialog):
         h_manual_break_layout.addWidget(h_manual_break_label)
         h_manual_break_layout.addWidget(self.h_manual_break_extra_spacing_edit, 0)
         manual_break_spacing_layout.addLayout(h_manual_break_layout)
-
         v_manual_break_layout = QHBoxLayout()
         v_manual_break_label = QLabel("竖排手动换列额外间距 (像素):")
         self.v_manual_break_extra_spacing_edit = QLineEdit()
@@ -95,8 +83,6 @@ class TextStyleSettingsDialog(QDialog):
         v_manual_break_layout.addWidget(self.v_manual_break_extra_spacing_edit, 0)
         manual_break_spacing_layout.addLayout(v_manual_break_layout)
         text_style_layout.addWidget(manual_break_spacing_group)
-
-
         main_color_layout = QHBoxLayout()
         main_color_label = QLabel("文本主颜色 (R,G,B,A):")
         self.text_main_color_edit = QLineEdit()
@@ -121,15 +107,12 @@ class TextStyleSettingsDialog(QDialog):
         self.text_bg_color_edit.setPlaceholderText("例如: 0,0,0,128")
         text_bg_color_layout.addWidget(text_bg_color_label); text_bg_color_layout.addWidget(self.text_bg_color_edit, 1)
         text_style_layout.addLayout(text_bg_color_layout)
-        
         main_layout.addWidget(text_style_group)
-
         button_layout = QHBoxLayout()
         button_layout.addSpacerItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         self.save_button = QPushButton("保存"); self.cancel_button = QPushButton("取消")
         button_layout.addWidget(self.save_button); button_layout.addWidget(self.cancel_button)
         main_layout.addLayout(button_layout)
-
     def _load_settings(self):
         self.font_name_edit.setText(self.config_manager.get('UI', 'font_name', fallback='msyh.ttc'))
         self.fixed_font_size_edit.setText(self.config_manager.get('UI', 'fixed_font_size', fallback='0'))
@@ -137,39 +120,31 @@ class TextStyleSettingsDialog(QDialog):
         self.h_text_line_spacing_edit.setText(self.config_manager.get('UI', 'h_text_line_spacing_px', fallback='0'))
         self.v_text_column_spacing_edit.setText(self.config_manager.get('UI', 'v_text_column_spacing_px', fallback='0'))
         self.v_text_char_spacing_edit.setText(self.config_manager.get('UI', 'v_text_char_spacing_px', fallback='0'))
-        
         self.h_manual_break_extra_spacing_edit.setText(self.config_manager.get('UI', 'h_manual_break_extra_spacing_px', fallback='0'))
         self.v_manual_break_extra_spacing_edit.setText(self.config_manager.get('UI', 'v_manual_break_extra_spacing_px', fallback='0'))
-
         self.text_main_color_edit.setText(self.config_manager.get('UI', 'text_main_color', fallback='255,255,255,255'))
         self.text_outline_color_edit.setText(self.config_manager.get('UI', 'text_outline_color', fallback='0,0,0,255'))
         self.text_outline_thickness_edit.setText(self.config_manager.get('UI', 'text_outline_thickness', fallback='2'))
         self.text_bg_color_edit.setText(self.config_manager.get('UI', 'text_background_color', fallback='0,0,0,128'))
-
     def _save_settings(self):
         self.config_manager.set('UI', 'font_name', self.font_name_edit.text())
         fixed_font_size_to_save = self.fixed_font_size_edit.text().strip()
         if not fixed_font_size_to_save: fixed_font_size_to_save = "0"
         self.config_manager.set('UI', 'fixed_font_size', fixed_font_size_to_save)
-        
         self.config_manager.set('UI', 'h_text_char_spacing_px', self.h_text_char_spacing_edit.text().strip() or '0')
         self.config_manager.set('UI', 'h_text_line_spacing_px', self.h_text_line_spacing_edit.text().strip() or '0')
         self.config_manager.set('UI', 'v_text_column_spacing_px', self.v_text_column_spacing_edit.text().strip() or '0')
         self.config_manager.set('UI', 'v_text_char_spacing_px', self.v_text_char_spacing_edit.text().strip() or '0')
-
         self.config_manager.set('UI', 'h_manual_break_extra_spacing_px', self.h_manual_break_extra_spacing_edit.text().strip() or '0')
         self.config_manager.set('UI', 'v_manual_break_extra_spacing_px', self.v_manual_break_extra_spacing_edit.text().strip() or '0')
-
         self.config_manager.set('UI', 'text_main_color', self.text_main_color_edit.text())
         self.config_manager.set('UI', 'text_outline_color', self.text_outline_color_edit.text())
         self.config_manager.set('UI', 'text_outline_thickness', self.text_outline_thickness_edit.text())
         self.config_manager.set('UI', 'text_background_color', self.text_bg_color_edit.text())
         return True
-
     def _connect_signals(self):
         self.save_button.clicked.connect(self.on_save)
         self.cancel_button.clicked.connect(self.reject)
-
     @pyqtSlot()
     def on_save(self):
         fixed_font_size_str = self.fixed_font_size_edit.text().strip()
@@ -177,7 +152,6 @@ class TextStyleSettingsDialog(QDialog):
             if not fixed_font_size_str.isdigit() or int(fixed_font_size_str) < 0:
                 QMessageBox.warning(self, "输入错误", "固定字体大小必须是一个非负整数。\n如果想使用动态大小，请留空或填0。")
                 self.fixed_font_size_edit.setFocus(); return
-        
         for edit_field, name in [
             (self.h_text_char_spacing_edit, "横排文本字符间距"),
             (self.h_text_line_spacing_edit, "横排文本行间距"),
@@ -193,7 +167,6 @@ class TextStyleSettingsDialog(QDialog):
                 except ValueError:
                     QMessageBox.warning(self, "输入错误", f"{name}必须是一个整数。")
                     edit_field.setFocus(); return
-        
         for edit_field, name in [
             (self.text_main_color_edit, "文本主颜色"),
             (self.text_outline_color_edit, "文本描边颜色"),
@@ -204,10 +177,8 @@ class TextStyleSettingsDialog(QDialog):
             if not (len(parts) == 3 or len(parts) == 4) or not all(p.strip().isdigit() for p in parts):
                 QMessageBox.warning(self, "输入错误", f"{name} 格式不正确。应为 R,G,B 或 R,G,B,A 格式，例如 255,255,255,255。")
                 edit_field.setFocus(); return
-        
         if not self.text_outline_thickness_edit.text().strip().isdigit():
             QMessageBox.warning(self, "输入错误", "文本描边厚度必须是一个数字。")
             self.text_outline_thickness_edit.setFocus(); return
-
         if self._save_settings():
             self.accept()

@@ -1,18 +1,14 @@
-                                          
 import os
 import time
 import json
 import sys
 import threading
-
 from config_manager import ConfigManager
 from utils.font_utils import PILLOW_AVAILABLE, get_pil_font, get_font_line_height, wrap_text_pil
 if PILLOW_AVAILABLE:
     from PIL import Image, ImageDraw, ImageFont
-
 from services.ocr_providers import get_ocr_provider, OCRResult
 from services.translation_providers import get_translation_provider, TranslationResult, GeminiTextTranslationProvider
-
 try:
     import google.generativeai as genai
     import google.api_core.exceptions
@@ -21,7 +17,6 @@ except ImportError:
     GEMINI_AVAILABLE = False
     genai = None
     google = None
-
 class ProcessedBlock:
     def __init__(self, original_text: str, translated_text: str, bbox: list[int],
                  orientation: str = "horizontal",
@@ -29,28 +24,23 @@ class ProcessedBlock:
                  font_size_pixels: int = 22,
                  angle: float = 0.0,
                  id: str | int | None = None,
-                 text_align: str | None = None  # 修改: 默认值改为 None
+                 text_align: str | None = None                  
                  ):
         self.id = id if id is not None else str(time.time_ns())
         self.original_text = original_text
         self.translated_text = translated_text
         self.bbox = bbox
-
         if orientation not in ["horizontal", "vertical_ltr", "vertical_rtl"]:
             self.orientation = "horizontal"
         else:
             self.orientation = orientation
-
         valid_categories = ["very_small", "small", "medium", "large", "very_large"]
         if font_size_category not in valid_categories:
             self.font_size_category = "medium"
         else:
             self.font_size_category = font_size_category
-
         self.font_size_pixels = font_size_pixels
         self.angle = angle
-        
-        # 修改: 根据 orientation 设置默认的 text_align
         if text_align is None:
             if self.orientation != "horizontal":  
                 self.text_align = "right"
@@ -58,25 +48,19 @@ class ProcessedBlock:
                 self.text_align = "left"  
         else:
             self.text_align = text_align
-
-
     def __repr__(self):
         return (f"ProcessedBlock(id='{self.id}', original='{self.original_text[:10]}...', translated='{self.translated_text[:10]}...', "
                 f"bbox={self.bbox}, orientation='{self.orientation}', font_size_category='{self.font_size_category}', "
-                f"font_px={self.font_size_pixels}, angle={self.angle}, text_align='{self.text_align}')") # 添加 text_align 到 repr
-
+                f"font_px={self.font_size_pixels}, angle={self.angle}, text_align='{self.text_align}')")                       
 class ImageProcessor:
     def __init__(self, config_manager: ConfigManager):
         self.config_manager = config_manager
         self.last_error = None
         self.dependencies = self._check_internal_dependencies()
         self.gemini_model = None
-
         self._apply_proxy_settings_to_env()
-
         if self.dependencies["gemini_lib"]:
             pass
-
         self.font_size_mapping = {
             "very_small": self.config_manager.getint('FontSizeMapping', 'very_small', 12),
             "small": self.config_manager.getint('FontSizeMapping', 'small', 16),
@@ -84,7 +68,6 @@ class ImageProcessor:
             "large": self.config_manager.getint('FontSizeMapping', 'large', 28),
             "very_large": self.config_manager.getint('FontSizeMapping', 'very_large', 36),
         }
-
     def _apply_proxy_settings_to_env(self):
         if self.config_manager.getboolean('Proxy', 'enabled', fallback=False):
             proxy_host = self.config_manager.get('Proxy', 'host')
@@ -97,29 +80,23 @@ class ImageProcessor:
             current_https_proxy = os.environ.get('HTTPS_PROXY', '')
             current_http_proxy = os.environ.get('HTTP_PROXY', '')
             proxy_host_check = self.config_manager.get('Proxy', 'host', '')
-
             if 'HTTPS_PROXY' in os.environ and (current_https_proxy.startswith("http://127.0.0.1") or (proxy_host_check and proxy_host_check in current_https_proxy)):
                 del os.environ['HTTPS_PROXY']
             if 'HTTP_PROXY' in os.environ and (current_http_proxy.startswith("http://127.0.0.1") or (proxy_host_check and proxy_host_check in current_http_proxy)):
                 del os.environ['HTTP_PROXY']
-
     def _check_internal_dependencies(self):
         return {
             "pillow": PILLOW_AVAILABLE,
             "gemini_lib": GEMINI_AVAILABLE,
         }
-
     def _configure_gemini_if_needed(self) -> bool:
         if not self.dependencies["gemini_lib"]:
             self.last_error = "Gemini 库未加载。"
             return False
-
         api_key = self.config_manager.get('GeminiAPI', 'api_key')
         model_name = self.config_manager.get('GeminiAPI', 'model_name', 'gemini-1.5-flash-latest')
-
         if not api_key:
             return False
-
         try:
             genai.configure(api_key=api_key)
             expected_internal_model_name = f"models/{model_name}"
@@ -131,10 +108,8 @@ class ImageProcessor:
             self.last_error = f"配置 Gemini API 或实例化模型时发生错误: {e}"
             self.gemini_model = None
             return False
-
     def get_last_error(self) -> str | None:
         return self.last_error
-
     def _adjust_block_bbox_for_text_fit(self, block: ProcessedBlock, pil_font_for_calc: ImageFont.FreeTypeFont | ImageFont.ImageFont | None):
         """
         Adjusts the block's bbox if the provided text, font size, and padding
@@ -142,29 +117,21 @@ class ImageProcessor:
         """
         if not self.config_manager.getboolean('UI', 'auto_adjust_bbox_to_fit_text', fallback=True):
             return
-
         if not block.translated_text or not block.translated_text.strip() or not pil_font_for_calc or not PILLOW_AVAILABLE:
             return
-
         text_padding = self.config_manager.getint('UI', 'text_padding', 3)
         h_char_spacing_px = self.config_manager.getint('UI', 'h_text_char_spacing_px', 0)
         h_line_spacing_px = self.config_manager.getint('UI', 'h_text_line_spacing_px', 0)
         v_char_spacing_px = self.config_manager.getint('UI', 'v_text_char_spacing_px', 0)
         v_col_spacing_px = self.config_manager.getint('UI', 'v_text_column_spacing_px', 0)
-
-
         current_bbox_width = block.bbox[2] - block.bbox[0]
         current_bbox_height = block.bbox[3] - block.bbox[1]
-
         if current_bbox_width <= 0 or current_bbox_height <= 0:
             return
-
         max_content_width_for_wrapping = current_bbox_width - (2 * text_padding)
         max_content_height_for_wrapping = current_bbox_height - (2 * text_padding)
-
         if max_content_width_for_wrapping <= 0 or max_content_height_for_wrapping <= 0:
              return
-
         dummy_draw = None
         try:
             dummy_img = Image.new('RGBA', (1,1))
@@ -177,13 +144,10 @@ class ImageProcessor:
                 dummy_draw = DummyDrawMock()
             else:
                 return
-
         if not dummy_draw:
             return
-
         needed_content_width_unpadded = 0
         needed_content_height_unpadded = 0
-
         if block.orientation == "horizontal":
             _, total_h, _, max_w_achieved = wrap_text_pil(
                 dummy_draw, block.translated_text, pil_font_for_calc,
@@ -204,56 +168,44 @@ class ImageProcessor:
             )
             needed_content_width_unpadded = total_w
             needed_content_height_unpadded = max_h_achieved
-
         if needed_content_width_unpadded <=0 and needed_content_height_unpadded <=0 and block.translated_text:
             return
-
         required_bbox_width = needed_content_width_unpadded + (2 * text_padding)
         required_bbox_height = needed_content_height_unpadded + (2 * text_padding)
-
         expand_w = required_bbox_width > current_bbox_width
         expand_h = required_bbox_height > current_bbox_height
-
         if expand_w or expand_h:
             center_x = (block.bbox[0] + block.bbox[2]) / 2.0
             center_y = (block.bbox[1] + block.bbox[3]) / 2.0
-
             final_bbox_width = max(current_bbox_width, required_bbox_width)
             final_bbox_height = max(current_bbox_height, required_bbox_height)
-
             min_dim_after_adjust = 10
             final_bbox_width = max(final_bbox_width, min_dim_after_adjust)
             final_bbox_height = max(final_bbox_height, min_dim_after_adjust)
-
             block.bbox = [
                 center_x - final_bbox_width / 2.0,
                 center_y - final_bbox_height / 2.0,
                 center_x + final_bbox_width / 2.0,
                 center_y + final_bbox_height / 2.0,
             ]
-
     def process_image(self, image_path: str, progress_callback=None, cancellation_event: threading.Event = None) -> tuple[Image.Image, list[ProcessedBlock]] | None:
         self.last_error = None
         def _report_progress(percentage, message):
             if progress_callback:
                 progress_callback(percentage, message)
-
         def _check_cancelled():
             if cancellation_event and cancellation_event.is_set():
                 self.last_error = "处理已取消。"
                 return True
             return False
-
         _report_progress(0, f"开始处理: {os.path.basename(image_path)}")
         if _check_cancelled(): return None
-
         if not self.dependencies["pillow"]:
             self.last_error = "Pillow 库缺失，无法处理图片。"
             _report_progress(100, "错误: Pillow缺失"); return None
         if not os.path.exists(image_path):
             self.last_error = f"图片文件不存在: {image_path}"
             _report_progress(100, "错误: 文件不存在"); return None
-
         pil_image_original: Image.Image | None = None
         try:
             pil_image_original = Image.open(image_path).convert("RGBA")
@@ -262,18 +214,13 @@ class ImageProcessor:
         except Exception as e:
             self.last_error = f"使用 Pillow 加载图片失败: {e}";
             _report_progress(100, f"错误: {self.last_error}"); return None
-
         if _check_cancelled(): return None
-
         ocr_main_provider_pref = self.config_manager.get('API', 'ocr_provider', 'gemini').lower()
         trans_main_provider_pref = self.config_manager.get('API', 'translation_provider', 'gemini').lower()
-
         ocr_results_for_translation: list[OCRResult] = []
         intermediate_blocks_for_processing: list[dict] = []
-
         gemini_multimodal_attempted = False
         gemini_multimodal_succeeded_with_blocks = False
-
         if ocr_main_provider_pref == 'gemini':
             gemini_multimodal_attempted = True
             _report_progress(10, "主要 OCR 为 Gemini，尝试 Gemini 多模态处理...")
@@ -298,7 +245,6 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
 """
                         else:
                             glossary_instructions = "\nNo specific glossary provided for this translation task.\n"
-
                         prompt = f"""You are an expert image analysis and translation AI. Your task is to process the provided image by following these steps:
 1.  Identify all distinct visual text blocks or groupings (e.g., speech bubbles, info boxes, clear paragraphs or labels) in the image that contain significant Japanese text. Ignore very small, unclear, or isolated text.
 2.  For each identified text block/grouping, extract the complete original Japanese text from within it.
@@ -328,7 +274,6 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                             {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
                             {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
                         ]
-
                         if _check_cancelled(): return None
                         response = self.gemini_model.generate_content(
                             [prompt, pil_image_original],
@@ -336,14 +281,12 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                             request_options={"timeout": gemini_timeout}
                         )
                         _report_progress(35, "Gemini API (multimodal) 调用完成，解析响应...")
-
                         raw_response_text = response.text.strip()
                         cleaned_json_text = raw_response_text
                         if cleaned_json_text.startswith("```json"): cleaned_json_text = cleaned_json_text[7:]
                         elif cleaned_json_text.startswith("```"): cleaned_json_text = cleaned_json_text[3:]
                         if cleaned_json_text.endswith("```"): cleaned_json_text = cleaned_json_text[:-3]
                         cleaned_json_text = cleaned_json_text.strip()
-
                         if not cleaned_json_text or cleaned_json_text == "[]":
                             _report_progress(40, "Gemini 未检测到文本或返回空列表。")
                         else:
@@ -371,7 +314,6 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                                 _report_progress(40, f"Gemini 解析到 {len(intermediate_blocks_for_processing)} 块。")
                             else:
                                 self.last_error = f"Gemini 返回的不是预期的 JSON 列表。响应: {cleaned_json_text[:200]}"
-
                     except json.JSONDecodeError as json_err:
                         self.last_error = f"解析 Gemini 返回的 JSON 失败: {json_err}. 响应: {cleaned_json_text[:200] if 'cleaned_json_text' in locals() else 'N/A'}"
                     except AttributeError as attr_err:
@@ -385,104 +327,78 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                         self.last_error = f"Gemini API 调用失败 (GoogleAPIError): {api_error}"
                     except Exception as gemini_err:
                         self.last_error = f"调用 Gemini API 时发生未知错误: {gemini_err}"
-
-
                 else:
                     _report_progress(15, f"Gemini (主要OCR) 配置失败。")
                     if not self.last_error: self.last_error = "Gemini (主要OCR) 配置失败。"
             else:
                  _report_progress(15, "Gemini 库不可用 (主要OCR)。")
                  self.last_error = "Gemini 库不可用 (主要OCR)。"
-
         if _check_cancelled(): return None
-
         run_fallback_ocr = False                              
         if ocr_main_provider_pref != 'gemini':
-                                           
             _report_progress(45, f"主要 OCR 提供者 ('{ocr_main_provider_pref}') 不是 Gemini。准备执行配置的 OCR...")
             run_fallback_ocr = True
-
         if run_fallback_ocr:
             _report_progress(45, "执行回退 OCR 流程...")
-
             if gemini_multimodal_attempted:
                 self.last_error = None
-
-
             fallback_ocr_provider_name = self.config_manager.get('API', 'fallback_ocr_provider', 'local api (paddleocr)')
             ocr_provider_instance = get_ocr_provider(self.config_manager, fallback_ocr_provider_name)
-
             if ocr_provider_instance:
                 _report_progress(50, f"使用备用 OCR: {fallback_ocr_provider_name}...")
                 if _check_cancelled(): return None
-
                 ocr_results_temp = ocr_provider_instance.recognize_text(pil_image_original)
                 if ocr_results_temp is not None:
                     ocr_results_for_translation = ocr_results_temp
                 else:
                     ocr_error = ocr_provider_instance.get_last_error()
                     self.last_error = f"备用 OCR ({fallback_ocr_provider_name}) 失败: {ocr_error if ocr_error else '未知错误'}"
-
                 _report_progress(60, f"备用 OCR 完成，获得 {len(ocr_results_for_translation)} 结果。")
             else:
                 self.last_error = f"无法加载备用 OCR Provider: {fallback_ocr_provider_name}"
                 _report_progress(60, f"错误: 无法加载备用 OCR {fallback_ocr_provider_name}")
-
-
         if _check_cancelled(): return None
-
         needs_separate_translation_step = False
         if not intermediate_blocks_for_processing and ocr_results_for_translation:
             needs_separate_translation_step = True
         elif not ocr_results_for_translation and not intermediate_blocks_for_processing:
             if not self.last_error:
                 self.last_error = "在OCR阶段未能检测到任何文本。"
-
-
         if needs_separate_translation_step:
             _report_progress(65, "准备翻译 OCR 结果...")
             texts_to_translate = [ocr_res.text for ocr_res in ocr_results_for_translation]
-
             gemini_model_for_text_trans = None
             if 'gemini' in trans_main_provider_pref.lower():
                 if self._configure_gemini_if_needed() and self.gemini_model:
                     gemini_model_for_text_trans = self.gemini_model
                 else:
                     if not self.last_error: self.last_error = "无法配置Gemini进行文本翻译"
-
             translation_provider_instance = get_translation_provider(
                 self.config_manager,
                 trans_main_provider_pref,
                 gemini_model_instance_for_text_translation=gemini_model_for_text_trans
             )
             actual_translation_provider_name_for_log = trans_main_provider_pref
-
             if not translation_provider_instance:
                 _report_progress(68, f"主要翻译Provider '{trans_main_provider_pref}' 加载失败，尝试回退翻译。")
                 fallback_trans_provider_name = self.config_manager.get('API', 'fallback_translation_provider', '本地 llm api (sakura)')
                 actual_translation_provider_name_for_log = fallback_trans_provider_name
-
                 if 'gemini' in fallback_trans_provider_name.lower() and not gemini_model_for_text_trans:
                      if self._configure_gemini_if_needed() and self.gemini_model:
                         gemini_model_for_text_trans = self.gemini_model
-
                 translation_provider_instance = get_translation_provider(
                     self.config_manager,
                     fallback_trans_provider_name,
                     gemini_model_instance_for_text_translation=gemini_model_for_text_trans
                 )
-
             if translation_provider_instance:
                 if isinstance(translation_provider_instance, GeminiTextTranslationProvider) and gemini_model_for_text_trans:
                      actual_translation_provider_name_for_log = f"Gemini 文本翻译 ({gemini_model_for_text_trans.model_name.split('/')[-1] if hasattr(gemini_model_for_text_trans, 'model_name') else '未知'})"
-
                 _report_progress(70, f"使用翻译服务: {actual_translation_provider_name_for_log}...")
                 target_lang_for_trans_step = self.config_manager.get('GeminiAPI', 'target_language', 'Chinese')
-
                 if _check_cancelled(): return None
                 translated_results_list: list[TranslationResult] | None = translation_provider_instance.translate_batch(
                     texts_to_translate, target_language=target_lang_for_trans_step, source_language="Japanese", cancellation_event=cancellation_event)
-
                 if translated_results_list and len(translated_results_list) == len(ocr_results_for_translation):
                     for i, ocr_block in enumerate(ocr_results_for_translation):
                         intermediate_blocks_for_processing.append({
@@ -502,12 +418,9 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
             else:
                 self.last_error = f"无法加载任何翻译Provider (尝试了 '{trans_main_provider_pref}' 和回退)."
                 _report_progress(80, f"错误: 无法加载翻译服务。")
-
         if _check_cancelled(): return None
-
         _report_progress(85, f"转换 {len(intermediate_blocks_for_processing)} 个中间块...")
         final_processed_blocks: list[ProcessedBlock] = []
-
         for iblock_data in intermediate_blocks_for_processing:
             pixel_bbox = []
             if "bbox_pixels" in iblock_data:
@@ -526,19 +439,14 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                 ]
             else:
                 continue
-
             if not (pixel_bbox and len(pixel_bbox) == 4 and pixel_bbox[0] < pixel_bbox[2] and pixel_bbox[1] < pixel_bbox[3]):
                 continue
-
             font_size_cat = iblock_data.get('font_size_category', "medium")
             orientation = iblock_data.get('orientation', "horizontal")
-
             font_size_px = self.font_size_mapping.get(font_size_cat, self.font_size_mapping["medium"])
-
             fixed_font_size_override = self.config_manager.getint('UI', 'fixed_font_size', 0)
             if fixed_font_size_override > 0:
                 font_size_px = fixed_font_size_override
-
             current_block = ProcessedBlock(
                 id=iblock_data.get("id"),
                 original_text=iblock_data['original_text'],
@@ -550,27 +458,19 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                 angle=0.0,
                 text_align=iblock_data.get("text_align", None)
             )
-
             if self.config_manager.getboolean('UI', 'auto_adjust_bbox_to_fit_text', fallback=True) and PILLOW_AVAILABLE:
                 font_name_for_adjust = self.config_manager.get('UI', 'font_name', 'msyh.ttc')
                 pil_font_instance_for_adjust = get_pil_font(font_name_for_adjust, current_block.font_size_pixels)
                 if pil_font_instance_for_adjust:
                     self._adjust_block_bbox_for_text_fit(current_block, pil_font_instance_for_adjust)
-
             final_processed_blocks.append(current_block)
-
-
         if not final_processed_blocks and not self.last_error:
              self.last_error = "未在图像中检测到可处理的文本块 (最终检查)。"
-
         _report_progress(100, "信息提取完成。")
         return pil_image_original, final_processed_blocks
-
-
     def _find_font(self, font_name_or_path: str) -> str | None:
         if os.path.isabs(font_name_or_path) and os.path.exists(font_name_or_path):
             return font_name_or_path
-
         system_font_paths = []
         if sys.platform == "win32":
             system_font_paths.append(os.path.join(os.environ.get("WINDIR", "C:/Windows"), "Fonts"))
@@ -578,7 +478,6 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
             system_font_paths.extend(["/usr/share/fonts", "/usr/local/share/fonts", os.path.expanduser("~/.fonts"), os.path.expanduser("~/.local/share/fonts")])
         elif sys.platform == "darwin":
             system_font_paths.extend(["/System/Library/Fonts", "/Library/Fonts", os.path.expanduser("~/Library/Fonts")])
-
         if not any(font_name_or_path.lower().endswith(ext) for ext in [".ttf", ".otf", ".ttc"]):
             for ext in [".ttf", ".otf", ".ttc"]:
                 font_file_to_try = font_name_or_path + ext
@@ -591,7 +490,6 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                 if os.path.isdir(base_path):
                     potential_path = os.path.join(base_path, font_name_or_path)
                     if os.path.exists(potential_path): return potential_path
-
         if not font_name_or_path.lower().endswith(".ttc"):
             font_file_to_try_ttc = font_name_or_path + ".ttc"
             for base_path in system_font_paths:
@@ -599,4 +497,3 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                     potential_path = os.path.join(base_path, font_file_to_try_ttc)
                     if os.path.exists(potential_path): return potential_path
         return None
-                                        

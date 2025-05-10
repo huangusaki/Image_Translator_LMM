@@ -1,10 +1,7 @@
-                                        
 import os
 import time
 import json
 from abc import ABC, abstractmethod
-
-                                              
 try:
     from paddleocr import PaddleOCR
     PADDLEOCR_AVAILABLE = True
@@ -12,52 +9,38 @@ except ImportError:
     PADDLEOCR_AVAILABLE = False
     PaddleOCR = None                                          
     print("警告：无法导入 paddleocr。本地 PaddleOCR 功能将不可用。")
-
 try:
     from google.cloud import vision
-                                                                 
     GOOGLE_VISION_AVAILABLE = True
 except ImportError:
     GOOGLE_VISION_AVAILABLE = False
     vision = None
-                                                                                                                                          
     print("警告: 未安装 google-cloud-vision。Google Cloud Vision OCR 功能将不可用。")
-
 from utils.utils import process_ocr_results_merge_lines, PILLOW_AVAILABLE
 if PILLOW_AVAILABLE:
     from PIL import Image
-                                                                                            
-                                                                                         
-
-
 class OCRResult:
     def __init__(self, text: str, bbox: list[int], original_data=None):
         self.text = text
         self.bbox = bbox                               
         self.original_data = original_data                              
-
     def __repr__(self):
         return f"OCRResult(text='{self.text[:20]}...', bbox={self.bbox})"
-
 class OCRProvider(ABC):
     def __init__(self, config_manager):
         self.config_manager = config_manager
         self.last_error = None
-
     @abstractmethod
     def recognize_text(self, image_path_or_pil_image) -> list[OCRResult] | None:
         pass
-
     def get_last_error(self) -> str | None:
         return self.last_error
-
 class PaddleOCRProvider(OCRProvider):
     def __init__(self, config_manager):
         super().__init__(config_manager)
         self.paddle_ocr_instance = None
         self.lang = self.config_manager.get('LocalOcrAPI', 'paddle_lang', 'japan')
         print(f"*** [PaddleOCRProvider CONSTRUCTOR CALLED] Lang: {self.lang}, PADDLEOCR_AVAILABLE: {PADDLEOCR_AVAILABLE} ***")
-
     def _get_instance(self):
         print(f"*** [PaddleOCRProvider._get_instance ENTERED] Current instance: {'Exists' if self.paddle_ocr_instance else 'None'} ***")
         if not PADDLEOCR_AVAILABLE:                                                     
@@ -75,7 +58,6 @@ class PaddleOCRProvider(OCRProvider):
                 import traceback; traceback.print_exc()
                 return None
         return self.paddle_ocr_instance
-
     def recognize_text(self, image_path_or_pil_image) -> list[OCRResult] | None:
         self.last_error = None
         print(f"*** [PaddleOCRProvider.recognize_text CALLED] Input type: {type(image_path_or_pil_image)} ***")
@@ -83,7 +65,6 @@ class PaddleOCRProvider(OCRProvider):
         if not ocr_engine:
             print("*** [PaddleOCRProvider.recognize_text] OCR engine instance is None. Returning None. ***")
             return None
-
         input_data = image_path_or_pil_image
         if PILLOW_AVAILABLE and isinstance(image_path_or_pil_image, Image.Image):
             import numpy as np
@@ -93,7 +74,6 @@ class PaddleOCRProvider(OCRProvider):
              print(f"*** [PaddleOCRProvider.recognize_text] Input is image path: {image_path_or_pil_image} ***")
         else:
             print(f"*** [PaddleOCRProvider.recognize_text] Input is of unknown type: {type(image_path_or_pil_image)} ***")
-
         try:
             print(f"*** [PaddleOCRProvider.recognize_text] Calling ocr_engine.ocr()... ***")
             start_time = time.time()
@@ -101,20 +81,16 @@ class PaddleOCRProvider(OCRProvider):
             end_time = time.time()
             print(f"*** [PaddleOCRProvider.recognize_text] ocr_engine.ocr() call duration: {end_time - start_time:.2f}s ***")
             print(f"*** [PaddleOCRProvider.recognize_text] Raw PaddleOCR output (ocr_output_raw_outer_list): {ocr_output_raw_outer_list} ***")
-
             actual_raw_results = []
             if ocr_output_raw_outer_list and isinstance(ocr_output_raw_outer_list, list) and len(ocr_output_raw_outer_list) > 0:
                 if ocr_output_raw_outer_list[0] is not None:
                     actual_raw_results = ocr_output_raw_outer_list[0]
-            
             if not actual_raw_results:
                 print("*** [PaddleOCRProvider.recognize_text] No actual_raw_results from PaddleOCR. Returning []. ***")
                 return []
-
             print(f"*** [PaddleOCRProvider.recognize_text] Data for process_ocr_results_merge_lines: {actual_raw_results} ***")
             merged_paddle_results = process_ocr_results_merge_lines(actual_raw_results, lang_hint=self.lang)
             print(f"*** [PaddleOCRProvider.recognize_text] Merged results: {merged_paddle_results} ***")
-
             results = []
             for merged_text, first_vertices in merged_paddle_results:
                  if first_vertices and len(first_vertices) == 4: 
@@ -133,13 +109,11 @@ class PaddleOCRProvider(OCRProvider):
             print(f"*** [PaddleOCRProvider.recognize_text] EXCEPTION: {e} ***")
             import traceback; traceback.print_exc()
             return None
-
 class GoogleVisionOCRProvider(OCRProvider):
     def __init__(self, config_manager):
         super().__init__(config_manager)
         self.client = None
         print(f"*** [GoogleVisionOCRProvider CONSTRUCTOR CALLED] GOOGLE_VISION_AVAILABLE: {GOOGLE_VISION_AVAILABLE} ***")
-
     def _get_client(self):
         print(f"*** [GoogleVisionOCRProvider._get_client ENTERED] Current client: {'Exists' if self.client else 'None'} ***")
         if not GOOGLE_VISION_AVAILABLE:                                                     
@@ -148,7 +122,6 @@ class GoogleVisionOCRProvider(OCRProvider):
             return None
         if self.client:
             return self.client
-
         key_path = self.config_manager.get('GoogleAPI', 'service_account_json')
         if not key_path or not os.path.exists(key_path):
             self.last_error = "未配置或找不到有效的 Google 服务账号 JSON 文件路径。"
@@ -156,9 +129,6 @@ class GoogleVisionOCRProvider(OCRProvider):
             return None
         try:
             print(f"*** [GoogleVisionOCRProvider._get_client] Setting GOOGLE_APPLICATION_CREDENTIALS to: {key_path} ***")
-                                                                                           
-                                                                                              
-                                                         
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = key_path
             self.client = vision.ImageAnnotatorClient()
             print("*** [GoogleVisionOCRProvider._get_client] Google Vision client initialized successfully. ***")
@@ -169,7 +139,6 @@ class GoogleVisionOCRProvider(OCRProvider):
             import traceback; traceback.print_exc()
             self.client = None
             return None
-
     def recognize_text(self, image_path_or_pil_image) -> list[OCRResult] | None:
         self.last_error = None
         print(f"*** [GoogleVisionOCRProvider.recognize_text CALLED] Input type: {type(image_path_or_pil_image)} ***")
@@ -177,7 +146,6 @@ class GoogleVisionOCRProvider(OCRProvider):
         if not client:
             print("*** [GoogleVisionOCRProvider.recognize_text] Client instance is None. Returning None. ***")
             return None
-
         try:
             print(f"*** [GoogleVisionOCRProvider.recognize_text] Using Google Cloud Vision OCR... ***")
             if isinstance(image_path_or_pil_image, str):
@@ -194,24 +162,19 @@ class GoogleVisionOCRProvider(OCRProvider):
                 self.last_error = "Google Vision OCR: 无效的图像输入类型。"
                 print(f"    [GoogleVisionOCRProvider.recognize_text] ERROR: Invalid image input type: {type(image_path_or_pil_image)}")
                 return None
-
             image = vision.Image(content=content)
             start_time = time.time()
             print(f"*** [GoogleVisionOCRProvider.recognize_text] Calling client.text_detection()... ***")
             response = client.text_detection(image=image, image_context={"language_hints": ["ja"]})
             end_time = time.time()
             print(f"*** [GoogleVisionOCRProvider.recognize_text] client.text_detection() call duration: {end_time - start_time:.2f}s ***")
-
             if response.error.message:
                 self.last_error = f"Google OCR API 错误: {response.error.message}"
                 print(f"*** [GoogleVisionOCRProvider.recognize_text] ERROR: Google OCR API error: {response.error.message} ***")
                 return None
-
             texts_annotations = response.text_annotations
             print(f"*** [GoogleVisionOCRProvider.recognize_text] Raw Google Vision output (text_annotations count): {len(texts_annotations)} ***")
-
             results = []
-                                                                         
             if texts_annotations and len(texts_annotations) > 1: 
                 google_raw_output_for_merging = []
                 for text_ann in texts_annotations[1:]: 
@@ -235,7 +198,6 @@ class GoogleVisionOCRProvider(OCRProvider):
             print(f"*** [GoogleVisionOCRProvider.recognize_text] EXCEPTION: {e} ***")
             import traceback; traceback.print_exc()
             return None
-
 def get_ocr_provider(config_manager, provider_name: str) -> OCRProvider | None:
     provider_name_lower = provider_name.lower()
     print(f"*** [get_ocr_provider CALLED] Requested provider: '{provider_name_lower}' ***")
@@ -254,4 +216,3 @@ def get_ocr_provider(config_manager, provider_name: str) -> OCRProvider | None:
     else:
         print(f"*** [get_ocr_provider] Unknown OCR Provider name: {provider_name}. Returning None. ***")
         return None
-                                      
