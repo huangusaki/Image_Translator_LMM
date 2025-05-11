@@ -8,11 +8,7 @@
 <!-- Chinese Version (Default) -->
 <a name="chinese-version"></a>
 
-## 图像翻译器
-
-### 🚀 安装与运行 (可选)
-
-[请在此处填写中文安装和运行指南]
+### 🚀 安装与运行 
 
 例如：
 0.  安装python，版本≥3.10
