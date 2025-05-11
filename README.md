@@ -1,4 +1,5 @@
 Image Translator is a desktop application built with PyQt6, designed to facilitate the optical character recognition (OCR) and translation of text embedded within images. It provides an interactive environment for users to load images, process them using various AI-powered services, and meticulously edit the resulting translated text overlays.
+*   **Sample Images:**
 ![Sample Image 4](sample/4.png)
 ![Sample Image 3](sample/3.png)
 ![Sample Image 2](sample/2.png)
