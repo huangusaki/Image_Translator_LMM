@@ -138,8 +138,11 @@ def check_horizontal_proximity (box1_data ,box2_data ,max_vertical_diff_ratio =0
             return False 
     else :
         if b2_x0 <b1_x0 :
-            if b1_x0 -b2_x0 >avg_h *0.5 :
-                return False 
+            overlap =min (b1_x1 ,b2_x1 )-max (b1_x0 ,b2_x0 )
+            if overlap <avg_h *min_overlap_ratio :
+                 pass 
+        if b2_x0 <b1_x0 and (b1_x0 -b2_x0 >avg_h *0.5 ):
+            return False 
     return True 
 def process_ocr_results_merge_lines (ocr_output_raw_segments :list ,lang_hint ='ja'):
     if not ocr_output_raw_segments or not isinstance (ocr_output_raw_segments ,list ):
@@ -178,8 +181,8 @@ def process_ocr_results_merge_lines (ocr_output_raw_segments :list ,lang_hint ='
             elif isinstance (box_info_raw ,list )and len (box_info_raw )==8 :
                 try :
                     temp_v =[]
-                    for k in range (0 ,8 ,2 ):
-                        temp_v .append ((int (round (float (box_info_raw [k ]))),int (round (float (box_info_raw [k +1 ])))))
+                    for k_coord in range (0 ,8 ,2 ):
+                        temp_v .append ((int (round (float (box_info_raw [k_coord ]))),int (round (float (box_info_raw [k_coord +1 ])))))
                     if len (temp_v )==4 :
                         vertices_parsed =temp_v 
                     else :
@@ -209,7 +212,7 @@ def process_ocr_results_merge_lines (ocr_output_raw_segments :list ,lang_hint ='
             continue 
         current_block_data =raw_blocks [i ]
         current_text_line =current_block_data ['text']
-        current_line_vertices =list (current_block_data ['vertices'])
+        current_line_vertices_representation =list (current_block_data ['vertices'])
         current_line_bbox =list (current_block_data ['bbox'])
         last_merged_block_in_this_line =current_block_data 
         processed_block_ids .add (current_block_data ['id'])
@@ -237,7 +240,7 @@ def process_ocr_results_merge_lines (ocr_output_raw_segments :list ,lang_hint ='
                 processed_block_ids .add (next_block_candidate_data ['id'])
             else :
                 break 
-        merged_results .append ((current_text_line ,current_line_bbox ))
+        merged_results .append ((current_text_line ,current_line_vertices_representation ))
     return merged_results 
 def _render_single_block_pil_for_preview (
 block :'ProcessedBlock',
@@ -254,12 +257,6 @@ v_col_spacing_px :int ,
 h_manual_break_extra_px :int =0 ,
 v_manual_break_extra_px :int =0 ,
 )->Image .Image |None :
-    """
-    Renders a single ProcessedBlock to a new, UNROTATED Pillow Image.
-    The size of this image is now determined by block.bbox.
-    The text background (if enabled) will fill this bbox area (minus internal padding for text placement).
-    The block's angle is NOT applied here; rotation is handled by QPainter.
-    """
     if not PILLOW_AVAILABLE or not block .translated_text or not block .translated_text .strip ():
         if PILLOW_AVAILABLE and block .bbox :
             bbox_width =int (block .bbox [2 ]-block .bbox [0 ])
@@ -275,97 +272,49 @@ v_manual_break_extra_px :int =0 ,
     pil_font =get_pil_font (font_name_config ,font_size_to_use )
     if not pil_font :
         print (f"警告(_render_single_block_pil_for_preview): 无法加载字体 '{font_name_config}' (大小: {font_size_to_use}px)")
-        bbox_width_err =int (block .bbox [2 ]-block .bbox [0 ])if block .bbox else 100 
-        bbox_height_err =int (block .bbox [3 ]-block .bbox [1 ])if block .bbox else 50 
-        err_img =Image .new ("RGBA",(max (1 ,bbox_width_err ),max (1 ,bbox_height_err )),(255 ,0 ,0 ,100 ))
-        ImageDraw .Draw (err_img ).text ((5 ,5 ),"字体错误",font =ImageFont .load_default (),fill =(255 ,255 ,255 ,255 ))
+        bbox_w_err =int (block .bbox [2 ]-block .bbox [0 ])if block .bbox else 100 
+        bbox_h_err =int (block .bbox [3 ]-block .bbox [1 ])if block .bbox else 50 
+        err_img =Image .new ("RGBA",(max (1 ,bbox_w_err ),max (1 ,bbox_h_err )),(255 ,0 ,0 ,100 ))
+        ImageDraw .Draw (err_img ).text ((5 ,5 ),"字体错误",font =PILImageFont .load_default (),fill =(255 ,255 ,255 ,255 ))
         return err_img 
     text_to_draw =block .translated_text 
     dummy_metric_img =Image .new ('RGBA',(1 ,1 ))
     pil_draw_metric =ImageDraw .Draw (dummy_metric_img )
-    wrapped_segments :list [str ]
-    actual_text_render_width_unpadded :int 
-    actual_text_render_height_unpadded :int 
-    segment_secondary_dim_with_spacing :int 
     target_surface_width =int (block .bbox [2 ]-block .bbox [0 ])
     target_surface_height =int (block .bbox [3 ]-block .bbox [1 ])
     if target_surface_width <=0 or target_surface_height <=0 :
         print (f"警告(_render_single_block_pil_for_preview): block.bbox '{block.bbox}' 尺寸无效。")
         err_img_bbox =Image .new ("RGBA",(100 ,50 ),(255 ,0 ,0 ,100 ))
-        ImageDraw .Draw (err_img_bbox ).text ((5 ,5 ),"BBox错误",font =ImageFont .load_default (),fill =(255 ,255 ,255 ,255 ))
+        ImageDraw .Draw (err_img_bbox ).text ((5 ,5 ),"BBox错误",font =PILImageFont .load_default (),fill =(255 ,255 ,255 ,255 ))
         return err_img_bbox 
-    max_content_width_for_wrapping =target_surface_width -(2 *text_padding )
-    max_content_height_for_wrapping =target_surface_height -(2 *text_padding )
-    if max_content_width_for_wrapping <=0 or max_content_height_for_wrapping <=0 :
-        block_surface_nopad =Image .new ('RGBA',(target_surface_width ,target_surface_height ),(0 ,0 ,0 ,0 ))
-        draw_nopad =ImageDraw .Draw (block_surface_nopad )
-        if text_bg_color_pil and len (text_bg_color_pil )==4 and text_bg_color_pil [3 ]>0 :
-            draw_nopad .rectangle ([(0 ,0 ),(target_surface_width -1 ,target_surface_height -1 )],fill =text_bg_color_pil )
-        return block_surface_nopad 
+    max_content_width_for_wrapping =max (1 ,target_surface_width -(2 *text_padding ))
+    max_content_height_for_wrapping =max (1 ,target_surface_height -(2 *text_padding ))
+    wrapped_segments :list [str ]
+    actual_text_render_width_unpadded :int 
+    actual_text_render_height_unpadded :int 
+    seg_secondary_dim_with_spacing :int 
     if block .orientation =="horizontal":
-        wrap_dim_for_pil =max (1 ,int (max_content_width_for_wrapping ))
-        wrapped_segments ,initial_total_height ,seg_secondary_dim_with_spacing ,actual_text_render_width_unpadded =wrap_text_pil (
-        pil_draw_metric ,text_to_draw ,pil_font ,
-        max_dim =wrap_dim_for_pil ,
-        orientation ="horizontal",
-        char_spacing_px =h_char_spacing_px ,
-        line_or_col_spacing_px =h_line_spacing_px 
-        )
-        actual_text_render_height_unpadded =0 
-        if wrapped_segments :
-            for seg_text in wrapped_segments :
-                actual_text_render_height_unpadded +=seg_secondary_dim_with_spacing 
-                if seg_text =="":actual_text_render_height_unpadded +=h_manual_break_extra_px 
-        elif text_to_draw :
-             actual_text_render_height_unpadded =seg_secondary_dim_with_spacing if seg_secondary_dim_with_spacing >0 else get_font_line_height (pil_font ,font_size_to_use ,h_line_spacing_px )
-             actual_text_render_width_unpadded =pil_draw_metric .textlength (text_to_draw ,font =pil_font )+(h_char_spacing_px *(len (text_to_draw )-1 )if len (text_to_draw )>1 else 0 )
+        wrapped_segments ,actual_text_render_height_unpadded ,seg_secondary_dim_with_spacing ,actual_text_render_width_unpadded =wrap_text_pil (
+        pil_draw_metric ,text_to_draw ,pil_font ,max_dim =int (max_content_width_for_wrapping ),
+        orientation ="horizontal",char_spacing_px =h_char_spacing_px ,line_or_col_spacing_px =h_line_spacing_px )
     else :
-        wrap_dim_for_pil =max (1 ,int (max_content_height_for_wrapping ))
-        wrapped_segments ,initial_total_width ,seg_secondary_dim_with_spacing ,actual_text_render_height_unpadded =wrap_text_pil (
-        pil_draw_metric ,text_to_draw ,pil_font ,
-        max_dim =wrap_dim_for_pil ,
-        orientation ="vertical",
-        char_spacing_px =v_char_spacing_px ,
-        line_or_col_spacing_px =0 
-        )
-        actual_text_render_width_unpadded =0 
-        if wrapped_segments :
-            try :
-                single_col_visual_width_metric =pil_font .getlength ("M")
-                if single_col_visual_width_metric ==0 :single_col_visual_width_metric =pil_font .size if hasattr (pil_font ,'size')else font_size_to_use 
-            except AttributeError :single_col_visual_width_metric =pil_font .size if hasattr (pil_font ,'size')else font_size_to_use 
-            num_cols_pil =len (wrapped_segments )
-            for seg_idx ,seg_text in enumerate (wrapped_segments ):
-                actual_text_render_width_unpadded +=single_col_visual_width_metric 
-                if seg_idx <num_cols_pil -1 :
-                    actual_text_render_width_unpadded +=v_col_spacing_px 
-                    if seg_text =="":actual_text_render_width_unpadded +=v_manual_break_extra_px 
-        elif text_to_draw :
-            try :single_col_visual_width_metric =pil_font .getlength ("M")
-            except :single_col_visual_width_metric =font_size_to_use 
-            actual_text_render_width_unpadded =single_col_visual_width_metric 
-            actual_text_render_height_unpadded =(seg_secondary_dim_with_spacing if seg_secondary_dim_with_spacing >0 else get_font_line_height (pil_font ,font_size_to_use ,v_char_spacing_px ))*len (text_to_draw )
+        wrapped_segments ,actual_text_render_width_unpadded ,seg_secondary_dim_with_spacing ,actual_text_render_height_unpadded =wrap_text_pil (
+        pil_draw_metric ,text_to_draw ,pil_font ,max_dim =int (max_content_height_for_wrapping ),
+        orientation ="vertical",char_spacing_px =v_char_spacing_px ,line_or_col_spacing_px =v_col_spacing_px )
     if not wrapped_segments and text_to_draw :
         wrapped_segments =[text_to_draw ]
         if block .orientation =="horizontal":
-            if actual_text_render_width_unpadded <=0 :
-                 actual_text_render_width_unpadded =pil_draw_metric .textlength (text_to_draw ,font =pil_font )+(h_char_spacing_px *(len (text_to_draw )-1 )if len (text_to_draw )>1 else 0 )
-            if actual_text_render_height_unpadded <=0 :
-                 actual_text_render_height_unpadded =get_font_line_height (pil_font ,font_size_to_use ,h_line_spacing_px )
-            seg_secondary_dim_with_spacing =actual_text_render_height_unpadded 
+            actual_text_render_width_unpadded =pil_draw_metric .textlength (text_to_draw ,font =pil_font )+(h_char_spacing_px *(len (text_to_draw )-1 )if len (text_to_draw )>1 else 0 )
+            seg_secondary_dim_with_spacing =get_font_line_height (pil_font ,font_size_to_use ,h_line_spacing_px )
+            actual_text_render_height_unpadded =seg_secondary_dim_with_spacing 
         else :
-            if actual_text_render_width_unpadded <=0 :
-                try :actual_text_render_width_unpadded =pil_font .getlength ("M")
-                except :actual_text_render_width_unpadded =font_size_to_use 
-            if actual_text_render_height_unpadded <=0 :
-                 actual_text_render_height_unpadded =(get_font_line_height (pil_font ,font_size_to_use ,v_char_spacing_px ))*len (text_to_draw )
+            try :actual_text_render_width_unpadded =pil_font .getlength ("M")
+            except :actual_text_render_width_unpadded =font_size_to_use 
             seg_secondary_dim_with_spacing =get_font_line_height (pil_font ,font_size_to_use ,v_char_spacing_px )
-    if not wrapped_segments or actual_text_render_width_unpadded <=0 or actual_text_render_height_unpadded <=0 :
+            actual_text_render_height_unpadded =len (text_to_draw )*seg_secondary_dim_with_spacing 
+    if not wrapped_segments or (actual_text_render_width_unpadded <=0 or actual_text_render_height_unpadded <=0 )and text_to_draw :
         if text_to_draw :
-            print (f"警告(_render_single_block_pil_for_preview): 文本 '{text_to_draw[:20]}...' 的渲染尺寸为零或负（BBox阶段）。")
-            err_img_dim =Image .new ("RGBA",(target_surface_width ,target_surface_height ),(255 ,0 ,0 ,100 ))
-            ImageDraw .Draw (err_img_dim ).text ((text_padding ,text_padding ),"渲染尺寸错误",font =ImageFont .load_default (),fill =(255 ,255 ,255 ,255 ))
-            return err_img_dim 
+            print (f"警告(_render_single_block_pil_for_preview): 文本 '{text_to_draw[:20]}...' 的计算渲染尺寸为零或负。")
         empty_surface_fallback =Image .new ('RGBA',(target_surface_width ,target_surface_height ),(0 ,0 ,0 ,0 ))
         if text_bg_color_pil and len (text_bg_color_pil )==4 and text_bg_color_pil [3 ]>0 :
             ImageDraw .Draw (empty_surface_fallback ).rectangle ([(0 ,0 ),(target_surface_width -1 ,target_surface_height -1 )],fill =text_bg_color_pil )
@@ -376,32 +325,31 @@ v_manual_break_extra_px :int =0 ,
         draw_on_block_surface .rectangle ([(0 ,0 ),(target_surface_width -1 ,target_surface_height -1 )],fill =text_bg_color_pil )
     content_area_x_start =text_padding 
     content_area_y_start =text_padding 
-    text_block_start_x =content_area_x_start 
-    text_block_start_y =content_area_y_start 
+    text_block_overall_start_x =content_area_x_start 
+    text_block_overall_start_y =content_area_y_start 
     if block .orientation =="horizontal":
         if block .text_align =="center":
-            text_block_start_x =content_area_x_start +(max_content_width_for_wrapping -actual_text_render_width_unpadded )/2.0 
+            text_block_overall_start_x =content_area_x_start +(max_content_width_for_wrapping -actual_text_render_width_unpadded )/2.0 
         elif block .text_align =="right":
-            text_block_start_x =content_area_x_start +max_content_width_for_wrapping -actual_text_render_width_unpadded 
+            text_block_overall_start_x =content_area_x_start +max_content_width_for_wrapping -actual_text_render_width_unpadded 
     else :
         if block .text_align =="center":
-            text_block_start_x =content_area_x_start +(max_content_width_for_wrapping -actual_text_render_width_unpadded )/2.0 
+            text_block_overall_start_x =content_area_x_start +(max_content_width_for_wrapping -actual_text_render_width_unpadded )/2.0 
         elif block .text_align =="right":
-            text_block_start_x =content_area_x_start +max_content_width_for_wrapping -actual_text_render_width_unpadded 
+            text_block_overall_start_x =content_area_x_start +max_content_width_for_wrapping -actual_text_render_width_unpadded 
     if block .orientation =="horizontal":
-        current_y_pil =text_block_start_y 
+        current_y_pil =text_block_overall_start_y 
         for line_idx ,line_text in enumerate (wrapped_segments ):
             is_manual_break_line =(line_text =="")
             if not is_manual_break_line :
                 line_w_specific_pil =pil_draw_metric .textlength (line_text ,font =pil_font )
                 if len (line_text )>1 and h_char_spacing_px !=0 :
                     line_w_specific_pil +=h_char_spacing_px *(len (line_text )-1 )
-                line_offset_x_within_block =0 
+                line_draw_x_pil =text_block_overall_start_x 
                 if block .text_align =="center":
-                    line_offset_x_within_block =(actual_text_render_width_unpadded -line_w_specific_pil )/2.0 
+                    line_draw_x_pil =text_block_overall_start_x +(actual_text_render_width_unpadded -line_w_specific_pil )/2.0 
                 elif block .text_align =="right":
-                    line_offset_x_within_block =actual_text_render_width_unpadded -line_w_specific_pil 
-                line_draw_x_pil =text_block_start_x +line_offset_x_within_block 
+                    line_draw_x_pil =text_block_overall_start_x +(actual_text_render_width_unpadded -line_w_specific_pil )
                 if outline_thickness >0 and text_outline_color_pil and len (text_outline_color_pil )==4 and text_outline_color_pil [3 ]>0 :
                     for dx_o in range (-outline_thickness ,outline_thickness +1 ):
                         for dy_o in range (-outline_thickness ,outline_thickness +1 ):
@@ -427,22 +375,21 @@ v_manual_break_extra_px :int =0 ,
         try :
             single_col_visual_width_metric =pil_font .getlength ("M")
             if single_col_visual_width_metric ==0 :single_col_visual_width_metric =pil_font .size if hasattr (pil_font ,'size')else font_size_to_use 
-        except AttributeError :
-            single_col_visual_width_metric =pil_font .size if hasattr (pil_font ,'size')else font_size_to_use 
-        current_x_pil_col_start_abs =text_block_start_x 
+        except AttributeError :single_col_visual_width_metric =pil_font .size if hasattr (pil_font ,'size')else font_size_to_use 
+        current_x_pil_col_draw_start =0.0 
         if block .orientation =="vertical_rtl":
-            current_x_pil_col_start_abs =text_block_start_x +actual_text_render_width_unpadded -single_col_visual_width_metric 
+            current_x_pil_col_draw_start =text_block_overall_start_x +actual_text_render_width_unpadded -single_col_visual_width_metric 
+        else :
+            current_x_pil_col_draw_start =text_block_overall_start_x 
+        current_y_pil_char_start =text_block_overall_start_y 
         for col_idx ,col_text in enumerate (wrapped_segments ):
             is_manual_break_col =(col_text =="")
-            current_y_pil_char =text_block_start_y 
-            this_col_content_actual_height =0 
-            if not is_manual_break_col :
-                this_col_content_actual_height =len (col_text )*seg_secondary_dim_with_spacing 
+            current_y_pil_char =current_y_pil_char_start 
             if not is_manual_break_col :
                 for char_in_col_idx ,char_in_col in enumerate (col_text ):
                     char_w_specific_pil =pil_draw_metric .textlength (char_in_col ,font =pil_font )
                     char_x_offset_in_col_slot =(single_col_visual_width_metric -char_w_specific_pil )/2.0 
-                    final_char_draw_x =current_x_pil_col_start_abs +char_x_offset_in_col_slot 
+                    final_char_draw_x =current_x_pil_col_draw_start +char_x_offset_in_col_slot 
                     if outline_thickness >0 and text_outline_color_pil and len (text_outline_color_pil )==4 and text_outline_color_pil [3 ]>0 :
                         for dx_o in range (-outline_thickness ,outline_thickness +1 ):
                             for dy_o in range (-outline_thickness ,outline_thickness +1 ):
@@ -451,13 +398,13 @@ v_manual_break_extra_px :int =0 ,
                     draw_on_block_surface .text ((final_char_draw_x ,current_y_pil_char ),char_in_col ,font =pil_font ,fill =text_main_color_pil )
                     current_y_pil_char +=seg_secondary_dim_with_spacing 
             if col_idx <len (wrapped_segments )-1 :
-                spacing_to_next_col =single_col_visual_width_metric +v_col_spacing_px 
+                spacing_for_next_column =single_col_visual_width_metric +v_col_spacing_px 
                 if is_manual_break_col :
-                    spacing_to_next_col +=v_manual_break_extra_px 
+                    spacing_for_next_column +=v_manual_break_extra_px 
                 if block .orientation =="vertical_rtl":
-                    current_x_pil_col_start_abs -=spacing_to_next_col 
+                    current_x_pil_col_draw_start -=spacing_for_next_column 
                 else :
-                    current_x_pil_col_start_abs +=spacing_to_next_col 
+                    current_x_pil_col_draw_start +=spacing_for_next_column 
     return block_surface 
 def _draw_single_block_pil (
 draw_target_image :Image .Image ,
@@ -475,57 +422,38 @@ v_col_spacing_px :int ,
 h_manual_break_extra_px :int =0 ,
 v_manual_break_extra_px :int =0 
 )->None :
-    """
-    Draws a single processed block onto the draw_target_image.
-    This version now USES _render_single_block_pil_for_preview to get the block's visual content.
-    """
     if not PILLOW_AVAILABLE or not block .translated_text or not block .translated_text .strip ():
         return 
     rendered_block_content_pil =_render_single_block_pil_for_preview (
-    block =block ,
-    font_name_config =font_name_config ,
-    text_main_color_pil =text_main_color_pil ,
-    text_outline_color_pil =text_outline_color_pil ,
-    text_bg_color_pil =text_bg_color_pil ,
-    outline_thickness =outline_thickness ,
-    text_padding =text_padding ,
-    h_char_spacing_px =h_char_spacing_px ,
-    h_line_spacing_px =h_line_spacing_px ,
-    v_char_spacing_px =v_char_spacing_px ,
-    v_col_spacing_px =v_col_spacing_px ,
-    h_manual_break_extra_px =h_manual_break_extra_px ,
-    v_manual_break_extra_px =v_manual_break_extra_px 
-    )
-    if not rendered_block_content_pil :
-        return 
+    block =block ,font_name_config =font_name_config ,
+    text_main_color_pil =text_main_color_pil ,text_outline_color_pil =text_outline_color_pil ,
+    text_bg_color_pil =text_bg_color_pil ,outline_thickness =outline_thickness ,
+    text_padding =text_padding ,h_char_spacing_px =h_char_spacing_px ,
+    h_line_spacing_px =h_line_spacing_px ,v_char_spacing_px =v_char_spacing_px ,
+    v_col_spacing_px =v_col_spacing_px ,h_manual_break_extra_px =h_manual_break_extra_px ,
+    v_manual_break_extra_px =v_manual_break_extra_px )
+    if not rendered_block_content_pil :return 
     final_surface_to_paste =rendered_block_content_pil 
     if block .angle !=0 :
         try :
             final_surface_to_paste =rendered_block_content_pil .rotate (
             -block .angle ,
-            expand =True ,
-            resample =Image .Resampling .BICUBIC 
-            )
+            expand =True ,resample =Image .Resampling .BICUBIC )
         except Exception as e :
             print (f"Error rotating block content: {e}")
-            final_surface_to_paste =rendered_block_content_pil 
     block_center_x_orig_coords =(block .bbox [0 ]+block .bbox [2 ])/2.0 
     block_center_y_orig_coords =(block .bbox [1 ]+block .bbox [3 ])/2.0 
     paste_x =int (round (block_center_x_orig_coords -(final_surface_to_paste .width /2.0 )))
     paste_y =int (round (block_center_y_orig_coords -(final_surface_to_paste .height /2.0 )))
     if draw_target_image .mode !='RGBA':
-        try :
-            draw_target_image =draw_target_image .convert ('RGBA')
-        except Exception as e :
-            print (f"Error converting draw_target_image to RGBA: {e}")
-            return 
+        print (f"Warning (_draw_single_block_pil): draw_target_image is not RGBA (mode: {draw_target_image.mode}). Alpha compositing might not work as expected.")
     try :
         if final_surface_to_paste .mode =='RGBA':
             draw_target_image .alpha_composite (final_surface_to_paste ,(paste_x ,paste_y ))
         else :
             draw_target_image .paste (final_surface_to_paste ,(paste_x ,paste_y ))
     except Exception as e :
-        print (f"Error compositing block '{block.translated_text[:20]}...' onto target image: {e}")
+        print (f"Error compositing/pasting block '{block.translated_text[:20]}...' onto target image: {e}")
         try :
             if final_surface_to_paste .mode =='RGBA':
                 draw_target_image .paste (final_surface_to_paste ,(paste_x ,paste_y ),mask =final_surface_to_paste )
@@ -534,8 +462,10 @@ v_manual_break_extra_px :int =0
         except Exception as e_paste :
             print (f"Fallback paste also failed for block: {e_paste}")
 def draw_processed_blocks_pil (pil_image_original :Image .Image ,processed_blocks :list ,config_manager :ConfigManager )->Image .Image |None :
-    if not PILLOW_AVAILABLE or not pil_image_original or not processed_blocks :
+    if not PILLOW_AVAILABLE or not pil_image_original :
         return pil_image_original 
+    if not processed_blocks :
+        return pil_image_original .copy ()if pil_image_original else None 
     try :
         if pil_image_original .mode !='RGBA':
             base_image =pil_image_original .convert ('RGBA')
@@ -569,34 +499,21 @@ def draw_processed_blocks_pil (pil_image_original :Image .Image ,processed_block
             if not hasattr (block_item ,'translated_text')or not block_item .translated_text or not block_item .translated_text .strip ():
                 continue 
             if not hasattr (block_item ,'font_size_pixels')or not hasattr (block_item ,'bbox'):
-                print (f"Skipping block {idx} due to missing attributes (font_size_pixels or bbox).")
+                print (f"Skipping block {idx} due to missing attributes (font_size_pixels or bbox). Block: {block_item}")
                 continue 
-            if not hasattr (block_item ,'orientation'):
-                block_item .orientation ="horizontal"
+            if not hasattr (block_item ,'orientation'):block_item .orientation ="horizontal"
             if not hasattr (block_item ,'text_align')or not block_item .text_align :
-                if block_item .orientation !="horizontal":
-                    block_item .text_align ="right"
-                else :
-                    block_item .text_align ="left"
-                print (f"警告(draw_processed_blocks_pil): Block {getattr(block_item, 'id', 'N/A')} 缺少有效的 text_align，已设置为 '{block_item.text_align}'。")
-            if not hasattr (block_item ,'angle'):
-                block_item .angle =0.0 
+                block_item .text_align ="right"if block_item .orientation !="horizontal"else "left"
+            if not hasattr (block_item ,'angle'):block_item .angle =0.0 
             _draw_single_block_pil (
-            draw_target_image =base_image ,
-            block =block_item ,
-            font_name_config =font_name_conf ,
-            text_main_color_pil =main_color_pil ,
-            text_outline_color_pil =outline_color_pil ,
-            text_bg_color_pil =bg_color_pil ,
-            outline_thickness =outline_thick_conf ,
-            text_padding =text_pad_conf ,
-            h_char_spacing_px =h_char_spacing_conf ,
-            h_line_spacing_px =h_line_spacing_conf ,
-            v_char_spacing_px =v_char_spacing_conf ,
-            v_col_spacing_px =v_col_spacing_conf ,
+            draw_target_image =base_image ,block =block_item ,
+            font_name_config =font_name_conf ,text_main_color_pil =main_color_pil ,
+            text_outline_color_pil =outline_color_pil ,text_bg_color_pil =bg_color_pil ,
+            outline_thickness =outline_thick_conf ,text_padding =text_pad_conf ,
+            h_char_spacing_px =h_char_spacing_conf ,h_line_spacing_px =h_line_spacing_conf ,
+            v_char_spacing_px =v_char_spacing_conf ,v_col_spacing_px =v_col_spacing_conf ,
             h_manual_break_extra_px =h_manual_break_extra_conf ,
-            v_manual_break_extra_px =v_manual_break_extra_conf 
-            )
+            v_manual_break_extra_px =v_manual_break_extra_conf )
         return base_image 
     except Exception as e :
         print (f"错误(draw_processed_blocks_pil): {e}")

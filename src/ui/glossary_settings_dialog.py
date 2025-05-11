@@ -9,7 +9,7 @@ from PyQt6 .QtCore import Qt ,pyqtSlot
 class GlossarySettingsDialog (QDialog ):
     def __init__ (self ,config_manager ,parent =None ):
         super ().__init__ (parent )
-        self .setWindowTitle ("术语表设置 (本地LLM)")
+        self .setWindowTitle ("术语表设置 (Gemini)")
         self .config_manager =config_manager 
         self .glossary_terms =[]
         self .setMinimumWidth (550 )
@@ -77,7 +77,7 @@ class GlossarySettingsDialog (QDialog ):
         self .glossary_terms .clear ()
         self .glossary_list_widget .clear ()
         self .glossary_bulk_text_edit .clear ()
-        raw_glossary_text =self .config_manager .get ('LocalTranslationAPI','glossary_text',fallback ='')
+        raw_glossary_text =self .config_manager .get ('GeminiAPI','glossary_text',fallback ='')
         self .glossary_bulk_text_edit .setPlainText (raw_glossary_text )
         self ._parse_and_load_from_bulk_text ()
     def _parse_and_load_from_bulk_text (self ):
@@ -217,7 +217,7 @@ class GlossarySettingsDialog (QDialog ):
                  all_lines .append (original_line )
             else :
                  all_lines .append (f"{source}->{target}")
-        self .config_manager .set ('LocalTranslationAPI','glossary_text',"\n".join (all_lines ))
+        self .config_manager .set ('GeminiAPI','glossary_text',"\n".join (all_lines ))
     @pyqtSlot ()
     def on_save (self ):
         self ._save_glossary_to_config ()

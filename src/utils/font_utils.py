@@ -156,7 +156,6 @@ line_or_col_spacing_px :int =0
         single_segment_dim_secondary =get_font_line_height (font ,default_font_size ,line_or_col_spacing_px )
         current_line_text =""
         max_line_width_achieved =0 
-        words =text .split (' ')
         current_char_idx =0 
         while current_char_idx <len (text ):
             char_val =text [current_char_idx ]

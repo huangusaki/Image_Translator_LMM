@@ -601,7 +601,14 @@ class InteractiveLabel (QWidget ):
             set_align_right_action =align_menu .addAction ("右对齐")
             action =menu .exec (event .globalPos ())
             if action ==edit_action :
-                fake_mouse_event =QMouseEvent (QEvent .Type .MouseButtonDblClick ,QPointF (event .pos ()),event .globalPos (),Qt .MouseButton .LeftButton ,Qt .MouseButton .LeftButton ,Qt .KeyboardModifier .NoModifier )
+                fake_mouse_event =QMouseEvent (
+                QEvent .Type .MouseButtonDblClick ,
+                QPointF (event .pos ()),
+                QPointF (event .globalPos ()),
+                Qt .MouseButton .LeftButton ,
+                Qt .MouseButton .LeftButton ,
+                Qt .KeyboardModifier .NoModifier 
+                )
                 self .mouseDoubleClickEvent (fake_mouse_event )
             elif action ==delete_action and self .selected_block :
                 self .processed_blocks .remove (self .selected_block )

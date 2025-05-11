@@ -11,6 +11,7 @@ DEFAULT_CONFIG ={
 'last_bg_dir':os .path .expanduser ("~"),
 'last_icon_dir':os .path .expanduser ("~"),
 'last_save_dir':os .path .expanduser ("~"),
+'last_glossary_dir':os .path .expanduser ("~"),
 'font_name':'msyh.ttc',
 'fixed_font_size':'0',
 'text_padding':'3',
@@ -26,6 +27,7 @@ DEFAULT_CONFIG ={
 'v_text_char_spacing_px':'0',
 'h_manual_break_extra_spacing_px':'0',
 'v_manual_break_extra_spacing_px':'0',
+'auto_adjust_bbox_to_fit_text':'True',
 },
 'FontSizeMapping':{
 'very_small':'12',
@@ -38,7 +40,6 @@ DEFAULT_CONFIG ={
 'ocr_provider':'gemini',
 'translation_provider':'gemini',
 'fallback_ocr_provider':'google cloud vision',
-'fallback_translation_provider':'本地 llm api (sakura)',
 },
 'GeminiAPI':{
 'api_key':'',
@@ -46,16 +47,10 @@ DEFAULT_CONFIG ={
 'gemini_base_url':'',
 'request_timeout':'60',
 'target_language':'Chinese',
+'glossary_text':'',
 },
 'GoogleAPI':{
 'service_account_json':'',
-},
-'LocalTranslationAPI':{
-'translation_url':'http://127.0.0.1:8000/v1/chat/completions',
-'model_name':'sakura-14b-qwen2.5-v1.0',
-'target_language':'Chinese',
-'glossary_text':'',
-'request_timeout':'90',
 },
 'Proxy':{
 'enabled':'False',
