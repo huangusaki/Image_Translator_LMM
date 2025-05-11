@@ -45,4 +45,4 @@ Image Translator is a desktop application built with PyQt6, designed to facilita
     *   **Progress Indication:** Visual feedback with progress bars and status messages for long-running operations (image processing, batch translation).
     *   **Cancellable Operations:** Ability to cancel ongoing single or batch processing tasks.
     *   **Export Functionality:** Save the final image with all translated and styled text blocks rendered onto it.
-  AI总结的，懒得写
+*   **以上全是AI总结的，太空不好看**
