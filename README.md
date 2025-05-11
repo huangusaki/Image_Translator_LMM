@@ -12,9 +12,8 @@
 
 0.  安装python，版本≥3.10
 1.  下载项目代码
-2.  解压，进入有main.py的主目录
-3.  右键使用powershell以及pip安装依赖:pip install -r requirements.txt
-4.  在powershell中运行: python main.py
+2.  解压，进入有requirements.txt的目录使用powershell输入命令:pip install -r requirements.txt
+4.  进入main.py的目录在powershell中运行命令: python main.py
 5.  配置API，OCR和翻译都选gemini，默认的就行，模型推荐：gemini-2.5-flash-preview-04-17-thinking
 6.  默认base_url:https://generativelanguage.googleapis.com/v1beta/openai/
 7.  代理需要设置你自己的端口号以及地址
