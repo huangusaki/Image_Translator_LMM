@@ -9,7 +9,7 @@ from PyQt6 .QtCore import Qt ,pyqtSlot
 class GlossarySettingsDialog (QDialog ):
     def __init__ (self ,config_manager ,parent =None ):
         super ().__init__ (parent )
-        self .setWindowTitle ("术语表设置 (Gemini)")
+        self .setWindowTitle ("术语表设置")
         self .config_manager =config_manager 
         self .glossary_terms =[]
         self .setMinimumWidth (550 )
@@ -40,7 +40,7 @@ class GlossarySettingsDialog (QDialog ):
         glossary_list_actions_layout .addWidget (self .glossary_delete_selected_button )
         glossary_group_layout .addLayout (glossary_list_actions_layout )
         self .glossary_bulk_text_edit =QTextEdit ()
-        self .glossary_bulk_text_edit .setPlaceholderText ("批量导入术语表 (每行格式: 原文->译文[ #可选注释])\n例如:\nリエル->莉艾露\n周->周 # 角色名")
+        self .glossary_bulk_text_edit .setPlaceholderText ("批量导入术语表 (每行格式: 原文->译文[ #可选注释])\n例如:\nリエル->莉艾露\nGloria->格洛丽亚 # 角色名")
         self .glossary_bulk_text_edit .setMinimumHeight (100 )
         glossary_group_layout .addWidget (self .glossary_bulk_text_edit )
         glossary_bulk_actions_layout =QHBoxLayout ()

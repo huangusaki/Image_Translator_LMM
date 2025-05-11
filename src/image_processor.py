@@ -172,22 +172,23 @@ class ImageProcessor :
             max_dim =int (max_content_height_for_wrapping ),orientation ="vertical",
             char_spacing_px =v_char_spacing_px ,line_or_col_spacing_px =v_col_spacing_px )
             needed_content_width_unpadded =total_w ;needed_content_height_unpadded =max_h_achieved 
-        if needed_content_width_unpadded <=0 and needed_content_height_unpadded <=0 and block .translated_text :return 
+        if needed_content_width_unpadded <=0 and needed_content_height_unpadded <=0 and block .translated_text and block .translated_text .strip ():
+            return 
         required_bbox_width =needed_content_width_unpadded +(2 *text_padding )
         required_bbox_height =needed_content_height_unpadded +(2 *text_padding )
-        expand_w =required_bbox_width >current_bbox_width 
-        expand_h =required_bbox_height >current_bbox_height 
-        if expand_w or expand_h :
-            center_x =(block .bbox [0 ]+block .bbox [2 ])/2.0 
-            center_y =(block .bbox [1 ]+block .bbox [3 ])/2.0 
-            final_bbox_width =max (current_bbox_width ,required_bbox_width )
-            final_bbox_height =max (current_bbox_height ,required_bbox_height )
-            min_dim_after_adjust =10 
-            final_bbox_width =max (final_bbox_width ,min_dim_after_adjust )
-            final_bbox_height =max (final_bbox_height ,min_dim_after_adjust )
-            block .bbox =[
-            center_x -final_bbox_width /2.0 ,center_y -final_bbox_height /2.0 ,
-            center_x +final_bbox_width /2.0 ,center_y +final_bbox_height /2.0 ,]
+        if required_bbox_width <=0 or required_bbox_height <=0 :
+            return 
+        center_x =(block .bbox [0 ]+block .bbox [2 ])/2.0 
+        center_y =(block .bbox [1 ]+block .bbox [3 ])/2.0 
+        final_bbox_width =required_bbox_width 
+        final_bbox_height =required_bbox_height 
+        min_dim_after_adjust =10 
+        final_bbox_width =max (final_bbox_width ,min_dim_after_adjust )
+        final_bbox_height =max (final_bbox_height ,min_dim_after_adjust )
+        block .bbox =[
+        center_x -final_bbox_width /2.0 ,center_y -final_bbox_height /2.0 ,
+        center_x +final_bbox_width /2.0 ,center_y +final_bbox_height /2.0 ,
+        ]
     def process_image (self ,image_path :str ,progress_callback =None ,cancellation_event :threading .Event =None )->tuple [Image .Image ,list [ProcessedBlock ]]|None :
         self .last_error =None 
         def _report_progress (percentage ,message ):
@@ -254,31 +255,29 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
         ii. Also extract clearly legible onomatopoeia (sound effects, e.g., ドン, バン, ゴゴゴ) if they are visually prominent and appear to be part of the narrative.
         iii.Also extract text from rectangular or distinct narrative boxes (often used for narration or location/time setting).
         iv. If there are significant, long dialogue or narrative passages that are *not* enclosed in bubbles or boxes but are clearly part of the storytelling (e.g., a character's extended speech rendered as free-floating text), extract these as well.
-        v.  Generally, ignore text that is part of complex background art, very small ancillary details (like tiny copyright notices or artist signatures unless they are prominent features), or decorative text elements unless they function as onomatopoeia or crucial narrative as described above. Focus on text essential for understanding the story and dialogue.
+        v.  Generally, ignore text that is part of complex background art, very small ancillary details, or decorative text elements unless they function as onomatopoeia or crucial narrative. Focus on text essential for understanding the story and dialogue.
     *   **If the image is determined to be a general image (1.b):**
-        i.  Identify all distinct visual text blocks or groupings (e.g., speech bubbles if present but in a non-manga context like an ad, info boxes, clear paragraphs, labels, titles, captions) in the image that contain significant Japanese text.
-        ii. Ignore very small, unclear, or isolated text that doesn't convey significant meaning in the context of a general image.
-3.  **For each text block/grouping identified in Step 2 (whether from manga or general image):**
-    a.  Extract the complete original Japanese text from within it.
-    b.  Determine the primary orientation of the Japanese text within that block/grouping. Possible values are: "horizontal", "vertical_ltr" (vertical, columns read left-to-right), or "vertical_rtl" (vertical, columns read right-to-left).
-    c.  For the *Japanese text content itself* within each block/grouping, provide an *extremely precise and tightly wrapping* normalized bounding box. The format is [x_min_norm, y_min_norm, x_max_norm, y_max_norm]. These coordinates must be decimal numbers between 0.0 and 1.0, representing proportions of the image's total width and height, and should have 3 to 4 decimal places. This bounding box must be the smallest possible rectangle that fully encloses all Japanese text characters within that block/grouping, minimizing any whitespace or padding between the box edges and the outermost text characters. Ensure x_min_norm < x_max_norm and y_min_norm < y_max_norm. Focus on the actual extent of the text characters, not the overall container (like speech bubble tails or large empty backgrounds of info boxes).
-    d.  Based on the visual relative size of the Japanese text within the image, determine its font size category. Choose the most appropriate category from: "very_small", "small", "medium", "large", "very_large". Evaluation should be based on the text block's size relative to the overall image dimensions, the area occupied by its bounding box, and its visual prominence compared to other text blocks (if any).
-    e.  Translate the Japanese text from each block/grouping into fluent, natural, and semantically complete {target_language}. Ensure consistent terminology for nouns.
+        i.  Identify all distinct visual text blocks or groupings in the image that contain significant Japanese text.
+        ii. Ignore very small, unclear, or isolated text that doesn't convey significant meaning.
+3.  **For each text block/grouping identified in Step 2:**
+    a.  Extract the complete original Japanese text.
+    b.  Determine the primary orientation: "horizontal", "vertical_ltr", or "vertical_rtl".
+    c.  For the *Japanese text content itself*, provide a **PRECISE and REASONABLY TIGHT** normalized bounding box. The goal is to accurately capture the text's extent without excessive looseness, but also without collapsing the box. The format is [x_min_norm, y_min_norm, x_max_norm, y_max_norm] (0.0-1.0, 3-4 decimal places).
+        *   The bounding box should be the smallest rectangle that **fully encloses all Japanese text characters** of that block.
+        *   It should minimize *unnecessary* surrounding whitespace, but **ensure the box has a sensible width and height** appropriate for the text it contains. Avoid making one dimension extremely small if it makes the box non-representative of the text block's shape.
+        *   **Crucially, do not include non-text elements** like speech bubble outlines/tails or large empty areas of a dialogue box, unless these are unavoidably intertwined with the text characters. Focus on the text's actual footprint.
+        *   Ensure x_min_norm < x_max_norm and y_min_norm < y_max_norm. The box must have a non-zero area.
+    d.  Determine its font size category: "very_small", "small", "medium", "large", "very_large", based on its visual size relative to the image and other text.
+    e.  Translate the Japanese text into fluent {target_language}.
 {glossary_instructions}
-4.  **Output Format:** Return your results strictly in the following JSON format: a JSON list of objects. Each object represents one text block/grouping and its content, and must include these five keys:
-    - "original_text": string, the identified Japanese text from the block/grouping.
-    - "translated_text": string, the translated {target_language} text.
-    - "orientation": string, "horizontal", "vertical_ltr", or "vertical_rtl".
-    - "bounding_box": list of four floats [x_min_norm, y_min_norm, x_max_norm, y_max_norm], representing the extremely precise, tightly wrapped normalized coordinates (must have 3-4 decimal places) of the *Japanese text characters themselves, not the larger visual container*.
-    - "font_size_category": string, the font size category chosen from ["very_small", "small", "medium", "large", "very_large"].
-    Example (if target_language is English and it's a manga):
+4.  **Output Format:** JSON list of objects, each with: "original_text", "translated_text", "orientation", "bounding_box" (for the Japanese text characters, not the container), "font_size_category".
+    Example (if target_language is English, manga):
     [
       {{"original_text": "何だ！？", "translated_text": "What is it!?", "orientation": "vertical_rtl", "bounding_box": [0.152, 0.201, 0.250, 0.355], "font_size_category": "medium"}},
-      {{"original_text": "ドーン！", "translated_text": "BOOM!", "orientation": "horizontal", "bounding_box": [0.600, 0.705, 0.780, 0.800], "font_size_category": "large"}},
-      {{"original_text": "ここはどこだ…", "translated_text": "Where am I...", "orientation": "horizontal", "bounding_box": [0.450, 0.880, 0.700, 0.930], "font_size_category": "small"}}
+      {{"original_text": "ドーン！", "translated_text": "BOOM!", "orientation": "horizontal", "bounding_box": [0.600, 0.705, 0.780, 0.800], "font_size_category": "large"}}
     ]
-5.  **No Text Case:** If no qualifying text blocks/groupings are detected according to the rules above (for either image type), or if reliable identification and translation are not possible, return an empty list `[]`.
-6.  **JSON Purity:** Ensure your output is a pure, correctly formatted JSON string, without any ```json ... ``` markers or other explanatory text.
+5.  **No Text Case:** Return `[]` if no qualifying text is found.
+6.  **JSON Purity:** Output only the pure JSON string.
 """
             if pil_image_original is None :raise ValueError ("PIL Image is None before encoding.")
             base64_image_string =self ._encode_pil_image_to_base64 (pil_image_original ,image_format ="PNG")
@@ -288,7 +287,7 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
             if _check_cancelled ():return None 
             api_params ={
             "model":gemini_model_for_api_call ,"messages":messages_payload ,
-            "timeout":float (request_timeout_seconds ),"temperature":1.0 ,
+            "timeout":float (request_timeout_seconds ),"temperature":0.5 ,
             "reasoning_effort":"high"
             }
             response =self .openai_client .chat .completions .create (**api_params )
