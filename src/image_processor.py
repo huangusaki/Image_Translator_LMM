@@ -279,6 +279,9 @@ class ImageProcessor :
         cleaned_json_text =""
         try :
             target_language =self .config_manager .get ('GeminiAPI','target_language','Chinese')
+            source_language_from_config =self .config_manager .get ('GeminiAPI','source_language',fallback ='Japanese').strip ()
+            if not source_language_from_config :
+                source_language_from_config ="Japanese"
             raw_glossary_text =self .config_manager .get ('GeminiAPI','glossary_text',fallback ='').strip ()
             glossary_instructions =""
             if raw_glossary_text :
@@ -293,39 +296,61 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
 """
                 else :glossary_instructions ="\nNo specific glossary provided for this translation task.\n"
             else :glossary_instructions ="\nNo specific glossary provided for this translation task.\n"
-            prompt_text_for_api =f"""You are an expert image analysis and translation AI. Your task is to process the provided image by following these steps:
-1.  **Image Type Determination:** First, carefully analyze the image and determine if it is primarily:
-    a.  A manga/comic page (characterized by panels, speech bubbles, stylized art).
-    b.  A general image (e.g., photograph, document, illustration with informational text, poster, screenshot of an application, etc.).
-2.  **Text Block Identification and Extraction (Conditional on Image Type):**
-    *   **If the image is determined to be a manga/comic page (1.a):**
-        i.  Focus primarily on identifying and extracting Japanese text from speech bubbles, dialogue balloons, and thought bubbles.
-        ii. Also extract clearly legible onomatopoeia (sound effects, e.g., ドン, バン, ゴゴゴ) if they are visually prominent and appear to be part of the narrative.
-        iii.Also extract text from rectangular or distinct narrative boxes (often used for narration or location/time setting).
-        iv. If there are significant, long dialogue or narrative passages that are *not* enclosed in bubbles or boxes but are clearly part of the storytelling (e.g., a character's extended speech rendered as free-floating text), extract these as well.
-        v.  Generally, ignore text that is part of complex background art, very small ancillary details, or decorative text elements unless they function as onomatopoeia or crucial narrative. Focus on text essential for understanding the story and dialogue.
-    *   **If the image is determined to be a general image (1.b):**
-        i.  Identify all distinct visual text blocks or groupings in the image that contain significant Japanese text.
-        ii. Ignore very small, unclear, or isolated text that doesn't convey significant meaning.
-3.  **For each text block/grouping identified in Step 2:**
-    a.  Extract the complete original Japanese text.
-    b.  Determine the primary orientation: "horizontal", "vertical_ltr", or "vertical_rtl".
-    c.  For the *Japanese text content itself*, provide a **PRECISE and REASONABLY TIGHT** normalized bounding box. The goal is to accurately capture the text's extent without excessive looseness, but also without collapsing the box. The format is [x_min_norm, y_min_norm, x_max_norm, y_max_norm] (0.0-1.0, 3-4 decimal places).
-        *   The bounding box should be the smallest rectangle that **fully encloses all Japanese text characters** of that block.
-        *   It should minimize *unnecessary* surrounding whitespace, but **ensure the box has a sensible width and height** appropriate for the text it contains. Avoid making one dimension extremely small if it makes the box non-representative of the text block's shape.
-        *   **Crucially, do not include non-text elements** like speech bubble outlines/tails or large empty areas of a dialogue box, unless these are unavoidably intertwined with the text characters. Focus on the text's actual footprint.
-        *   Ensure x_min_norm < x_max_norm and y_min_norm < y_max_norm. The box must have a non-zero area.
-    d.  Determine its font size category: "very_small", "small", "medium", "large", "very_large", based on its visual size relative to the image and other text.
-    e.  Translate the Japanese text into fluent {target_language}.
+            prompt_text_for_api =f"""You are an expert AI assistant specializing in image understanding, OCR (Optical Character Recognition), and translation. Your task is to meticulously analyze the provided image, identify {source_language_from_config} text blocks, extract their content, and translate them into {target_language}, adhering strictly to the output format.
+Follow these steps precisely:
+1.  **Image Type Analysis:**
+    *   First, determine if the image is primarily:
+        a.  A manga/comic page (characterized by panels, speech bubbles, stylized art).
+        b.  A general image (e.g., photograph, document, illustration with informational text, poster, application screenshot).
+2.  **{source_language_from_config} Text Block Identification and Extraction (Conditional on Image Type):**
+    *   **For Manga/Comic Pages (1.a):**
+        *   Prioritize {source_language_from_config} text within speech bubbles, dialogue balloons, and thought bubbles.
+        *   Extract clearly legible {source_language_from_config} onomatopoeia (e.g., {"ドン, バン, ゴゴゴ" if source_language_from_config.lower() == 'japanese' else "SFX, SOUND_EFFECT"} - adjust example based on language or make generic) if visually prominent and part of the narrative.
+        *   Extract {source_language_from_config} text from distinct narrative boxes.
+        *   Extract significant, long {source_language_from_config} dialogue/narrative passages not in bubbles/boxes but clearly part of storytelling.
+        *   Generally, ignore {source_language_from_config} text in complex backgrounds, tiny ancillary details, or decorative elements unless they are crucial narrative/onomatopoeia. Focus on text essential for story/dialogue.
+    *   **For General Images (1.b):**
+        *   Identify all distinct visual text blocks containing significant {source_language_from_config} text.
+        *   Ignore very small, unclear, or isolated {source_language_from_config} text fragments that don't convey significant meaning.
+3.  **For EACH identified {source_language_from_config} text block:**
+    a.  **Original Text:** Extract the complete, exact {source_language_from_config} text.
+    b.  **Orientation:** Determine its primary orientation: "horizontal", "vertical_ltr" (left-to-right), or "vertical_rtl" (right-to-left).
+    c.  **Bounding Box (Critical):**
+        *   Provide a **PRECISE and TIGHT** normalized bounding box for the *{source_language_from_config} text characters themselves*.
+        *   Format: `[x_min_norm, y_min_norm, x_max_norm, y_max_norm]`.
+        *   Coordinates must be normalized floats between 0.0 and 1.0 (e.g., 0.152, not 152). Use 3-4 decimal places.
+        *   The box must be the smallest rectangle that **fully encloses all {source_language_from_config} text characters** of that block.
+        *   Minimize surrounding whitespace, but ensure the box has a sensible, non-zero width and height appropriate for the text.
+        *   **Crucially, DO NOT include non-text elements** like speech bubble outlines, tails, or large empty areas of a dialogue box, unless these are unavoidably intertwined with the text characters. Focus on the text's actual footprint.
+        *   Ensure `x_min_norm < x_max_norm` and `y_min_norm < y_max_norm`. The box must have a non-zero area.
+    d.  **Font Size Category:** Classify its visual size relative to the image and other text as: "very_small", "small", "medium", "large", or "very_large".
+    e.  **Translation:** Translate the extracted {source_language_from_config} text into fluent and natural {target_language}.
 {glossary_instructions}
-4.  **Output Format:** JSON list of objects, each with: "original_text", "translated_text", "orientation", "bounding_box" (for the Japanese text characters, not the container), "font_size_category".
-    Example (if target_language is English, manga):
-    [
-      {{"original_text": "何だ！？", "translated_text": "What is it!?", "orientation": "vertical_rtl", "bounding_box": [0.152, 0.201, 0.250, 0.355], "font_size_category": "medium"}},
-      {{"original_text": "ドーン！", "translated_text": "BOOM!", "orientation": "horizontal", "bounding_box": [0.600, 0.705, 0.780, 0.800], "font_size_category": "large"}}
-    ]
-5.  **No Text Case:** Return `[]` if no qualifying text is found.
-6.  **JSON Purity:** Output only the pure JSON string.
+4.  **Output Format (Strictly JSON):**
+    *   Return a JSON list of objects. Each object represents one processed text block.
+    *   Each object MUST contain these exact keys: "original_text" (string), "translated_text" (string), "orientation" (string), "bounding_box" (list of 4 floats), "font_size_category" (string).
+    *   Example (if {source_language_from_config} is Japanese and target_language is English, for a manga image):
+      ```json
+      [
+        {{
+          "original_text": "何だ！？",
+          "translated_text": "What is it!?",
+          "orientation": "vertical_rtl",
+          "bounding_box": [0.152, 0.201, 0.250, 0.355],
+          "font_size_category": "medium"
+        }},
+        {{
+          "original_text": "ドーン！",
+          "translated_text": "BOOM!",
+          "orientation": "horizontal",
+          "bounding_box": [0.600, 0.705, 0.780, 0.800],
+          "font_size_category": "large"
+        }}
+      ]
+      ```
+    (Consider making the example more generic if `source_language_from_config` is not Japanese, e.g., "Original Text Example", "Translated Example")
+5.  **No Text Found:** If no qualifying {source_language_from_config} text blocks are found in the image, return an empty JSON list: `[]`.
+6.  **JSON Purity:** The output MUST be *only* the raw JSON string. Do NOT include any explanatory text, comments, or markdown formatting (like ` ```json ... ``` `) outside of the JSON list itself.
 """
             if pil_image_for_llm is None :raise ValueError ("PIL Image for LLM is None before encoding.")
             base64_image_string =self ._encode_pil_image_to_base64 (pil_image_for_llm ,image_format ="PNG")
@@ -406,7 +431,10 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                     print (f"警告: bbox_norm 坐标转换失败: {e} - 数据: {norm_bbox} for block data: {iblock_data.get('original_text', '')[:20]}")
                     continue 
                 if img_width >0 and img_height >0 :
-                    pixel_bbox =[x_min_n *img_width ,y_min_n *img_height ,x_max_n *img_width ,y_max_n *img_height ]
+                    pixel_bbox =[
+                    x_min_n *img_width ,y_min_n *img_height ,
+                    x_max_n *img_width ,y_max_n *img_height 
+                    ]
                 else :
                     print ("警告: 图像尺寸无效，无法转换归一化BBox。")
                     continue 
@@ -422,11 +450,16 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
             fixed_font_size_override =self .config_manager .getint ('UI','fixed_font_size',0 )
             if fixed_font_size_override >0 :font_size_px =fixed_font_size_override 
             current_block =ProcessedBlock (
-            id =iblock_data .get ("id"),original_text =iblock_data ['original_text'],
-            translated_text =iblock_data ['translated_text'],bbox =pixel_bbox ,
-            orientation =orientation ,font_size_category =font_size_cat ,
-            font_size_pixels =font_size_px ,angle =0.0 ,
-            text_align =iblock_data .get ("text_align",None ))
+            id =iblock_data .get ("id"),
+            original_text =iblock_data ['original_text'],
+            translated_text =iblock_data ['translated_text'],
+            bbox =pixel_bbox ,
+            orientation =orientation ,
+            font_size_category =font_size_cat ,
+            font_size_pixels =font_size_px ,
+            angle =0.0 ,
+            text_align =iblock_data .get ("text_align",None )
+            )
             if self .config_manager .getboolean ('UI','auto_adjust_bbox_to_fit_text',fallback =True )and PILLOW_AVAILABLE :
                 font_name_for_adjust =self .config_manager .get ('UI','font_name','msyh.ttc')
                 pil_font_instance_for_adjust =get_pil_font (font_name_for_adjust ,current_block .font_size_pixels )

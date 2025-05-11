@@ -47,6 +47,7 @@ DEFAULT_CONFIG ={
 'gemini_base_url':'',
 'request_timeout':'60',
 'target_language':'Chinese',
+'source_language':'Japanese',
 'glossary_text':'',
 },
 'GoogleAPI':{

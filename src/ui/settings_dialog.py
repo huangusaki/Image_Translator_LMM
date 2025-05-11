@@ -88,6 +88,13 @@ class SettingsDialog (QDialog ):
         gemini_base_url_layout .addWidget (gemini_base_url_label )
         gemini_base_url_layout .addWidget (self .gemini_base_url_edit ,1 )
         gemini_main_layout .addLayout (gemini_base_url_layout )
+        gemini_source_lang_layout =QHBoxLayout ()
+        gemini_source_lang_label =QLabel ("Gemini 源语言:")
+        self .gemini_source_lang_edit =QLineEdit ()
+        self .gemini_source_lang_edit .setPlaceholderText ("例如: Japanese, English, Korean")
+        gemini_source_lang_layout .addWidget (gemini_source_lang_label )
+        gemini_source_lang_layout .addWidget (self .gemini_source_lang_edit ,1 )
+        gemini_main_layout .addLayout (gemini_source_lang_layout )
         gemini_target_lang_layout =QHBoxLayout ()
         gemini_target_lang_label =QLabel ("Gemini 目标翻译语言:")
         self .gemini_target_lang_edit =QLineEdit ()
@@ -170,6 +177,7 @@ class SettingsDialog (QDialog ):
         self .gemini_model_edit .setText (self .config_manager .get ('GeminiAPI','model_name',fallback ='gemini-1.5-flash-latest'))
         self .gemini_base_url_edit .setText (self .config_manager .get ('GeminiAPI','gemini_base_url',fallback =''))
         self .gemini_timeout_edit .setText (self .config_manager .get ('GeminiAPI','request_timeout',fallback ='60'))
+        self .gemini_source_lang_edit .setText (self .config_manager .get ('GeminiAPI','source_language',fallback ='Japanese'))
         self .gemini_target_lang_edit .setText (self .config_manager .get ('GeminiAPI','target_language',fallback ='Chinese'))
         self .google_key_edit .setText (self .config_manager .get ('GoogleAPI','service_account_json',fallback =''))
         proxy_enabled =self .config_manager .getboolean ('Proxy','enabled',fallback =False )
@@ -196,15 +204,16 @@ class SettingsDialog (QDialog ):
              self .config_manager .set ('API','fallback_ocr_provider','google cloud vision')
         self .config_manager .set ('API','translation_provider','gemini')
         self .config_manager .set ('GeminiAPI','api_key',self .gemini_api_key_edit .text ())
-        self .config_manager .set ('GeminiAPI','model_name',self .gemini_model_edit .text ())
-        self .config_manager .set ('GeminiAPI','request_timeout',self .gemini_timeout_edit .text ())
+        self .config_manager .set ('GeminiAPI','model_name',self .gemini_model_edit .text ().strip ()or 'gemini-1.5-flash-latest')
+        self .config_manager .set ('GeminiAPI','request_timeout',self .gemini_timeout_edit .text ().strip ()or '60')
         self .config_manager .set ('GeminiAPI','gemini_base_url',self .gemini_base_url_edit .text ().strip ())
-        self .config_manager .set ('GeminiAPI','target_language',self .gemini_target_lang_edit .text ())
+        self .config_manager .set ('GeminiAPI','source_language',self .gemini_source_lang_edit .text ().strip ()or 'Japanese')
+        self .config_manager .set ('GeminiAPI','target_language',self .gemini_target_lang_edit .text ().strip ()or 'Chinese')
         self .config_manager .set ('GoogleAPI','service_account_json',self .google_key_edit .text ())
         self .config_manager .set ('Proxy','enabled',str (self .proxy_checkbox .isChecked ()))
         self .config_manager .set ('Proxy','type','http')
-        self .config_manager .set ('Proxy','host',self .proxy_host_edit .text ())
-        self .config_manager .set ('Proxy','port',self .proxy_port_edit .text ())
+        self .config_manager .set ('Proxy','host',self .proxy_host_edit .text ().strip ()or '127.0.0.1')
+        self .config_manager .set ('Proxy','port',self .proxy_port_edit .text ().strip ()or '21524')
         self .config_manager .set ('LLMImagePreprocessing','enabled',str (self .llm_preprocess_enabled_checkbox .isChecked ()))
         self .config_manager .set ('LLMImagePreprocessing','upscale_factor',self .llm_upscale_factor_edit .text ().strip ()or '1.0')
         self .config_manager .set ('LLMImagePreprocessing','contrast_factor',self .llm_contrast_factor_edit .text ().strip ()or '1.0')
@@ -263,19 +272,21 @@ class SettingsDialog (QDialog ):
     @pyqtSlot ()
     def on_save (self ):
         if self .proxy_checkbox .isChecked ():
-            if not self .proxy_host_edit .text ():
+            if not self .proxy_host_edit .text ().strip ():
                  QMessageBox .warning (self ,"输入错误","启用了代理，但代理地址为空。");self .proxy_host_edit .setFocus ();return 
-            if not self .proxy_port_edit .text ().isdigit ():
+            if not self .proxy_port_edit .text ().strip ().isdigit ():
                  QMessageBox .warning (self ,"输入错误","代理端口必须是一个有效的数字。");self .proxy_port_edit .setFocus ();return 
-        if (self .primary_ocr_combo .currentIndex ()==0 or True ):
-            if not self .gemini_api_key_edit .text ():
-                QMessageBox .warning (self ,"输入错误","已选择 Gemini 作为Provider，但未填写 Gemini API Key。");self .gemini_api_key_edit .setFocus ();return 
-            if not self .gemini_target_lang_edit .text ():
-                QMessageBox .warning (self ,"输入错误","已选择 Gemini 作为Provider，但未填写 Gemini 目标翻译语言。");self .gemini_target_lang_edit .setFocus ();return 
-        gemini_timeout_str =self .gemini_timeout_edit .text ()
+        is_gemini_primary_ocr =(self .primary_ocr_combo .currentIndex ()==0 )
+        if True :
+            if not self .gemini_api_key_edit .text ().strip ():
+                QMessageBox .warning (self ,"输入错误","Gemini API Key 未填写。");self .gemini_api_key_edit .setFocus ();return 
+            if not self .gemini_source_lang_edit .text ().strip ():
+                QMessageBox .warning (self ,"输入错误","Gemini 源语言未填写。");self .gemini_source_lang_edit .setFocus ();return 
+            if not self .gemini_target_lang_edit .text ().strip ():
+                QMessageBox .warning (self ,"输入错误","Gemini 目标翻译语言未填写。");self .gemini_target_lang_edit .setFocus ();return 
+        gemini_timeout_str =self .gemini_timeout_edit .text ().strip ()
         if gemini_timeout_str and (not gemini_timeout_str .isdigit ()or int (gemini_timeout_str )<=0 ):
-             if gemini_timeout_str :
-                QMessageBox .warning (self ,"输入错误","Gemini 请求超时必须是一个正整数。");self .gemini_timeout_edit .setFocus ();return 
+             QMessageBox .warning (self ,"输入错误","Gemini 请求超时必须是一个正整数。");self .gemini_timeout_edit .setFocus ();return 
         gemini_base_url_str =self .gemini_base_url_edit .text ().strip ()
         if gemini_base_url_str and not (gemini_base_url_str .startswith ("http://")or gemini_base_url_str .startswith ("https://")):
             QMessageBox .warning (self ,"输入错误","Gemini Base URL 如果填写，必须以 http:// 或 https:// 开头。")
@@ -284,18 +295,18 @@ class SettingsDialog (QDialog ):
         if self .llm_preprocess_enabled_checkbox .isChecked ():
             try :
                 upscale_f =float (self .llm_upscale_factor_edit .text ().strip ())
-                if upscale_f <0.1 :raise ValueError ("Upscale factor too small")
+                if upscale_f <0.1 :raise ValueError ("Upscale factor too small or negative")
             except ValueError :
                 QMessageBox .warning (self ,"输入错误","LLM 图像放大倍数必须是一个有效的正数 (例如 1.0, 1.5)。");self .llm_upscale_factor_edit .setFocus ();return 
             try :
                 contrast_f =float (self .llm_contrast_factor_edit .text ().strip ())
-                if contrast_f <0.1 :raise ValueError ("Contrast factor too small")
+                if contrast_f <0.1 :raise ValueError ("Contrast factor too small or negative")
             except ValueError :
                 QMessageBox .warning (self ,"输入错误","LLM 图像对比度系数必须是一个有效的正数 (例如 1.0, 1.2)。");self .llm_contrast_factor_edit .setFocus ();return 
         if self ._save_settings ():
             if self .proxy_checkbox .isChecked ():
-                proxy_host =self .proxy_host_edit .text ()
-                proxy_port =self .proxy_port_edit .text ()
+                proxy_host =self .proxy_host_edit .text ().strip ()
+                proxy_port =self .proxy_port_edit .text ().strip ()
                 if proxy_host and proxy_port :
                     proxy_url =f"http://{proxy_host}:{proxy_port}"
                     os .environ ['HTTPS_PROXY']=proxy_url 
@@ -316,19 +327,67 @@ class SettingsDialog (QDialog ):
                 print ("SettingsDialog: Proxy disabled. Ensured related env vars potentially set by app are cleared.")
             self .accept ()
 if __name__ =='__main__':
-    from config_manager import ConfigManager as DummyCM 
+    class DummyCM:
+        def __init__(self, path):
+            self.path = path  
+            self.data = {}    
+
+        def get(self, s, o, fallback=None):
+            return self.data.get(s, {}).get(o, fallback)
+
+        def getboolean(self, s, o, fallback=False):
+            val_str = self.get(s, o, None)
+            if val_str is None:
+                return fallback
+            return val_str.lower() in ('true', '1', 'yes', 'on')
+
+        def getint(self, s, o, fallback=0):
+            val_str = self.get(s, o, None)
+            if val_str is None:
+                return fallback
+            try:
+                return int(val_str)
+            except (ValueError, TypeError):
+                return fallback
+
+        def getfloat(self, s, o, fallback=0.0):
+            val_str = self.get(s, o, None)
+            if val_str is None:
+                return fallback
+            try:
+                return float(val_str)
+            except (ValueError, TypeError):
+                return fallback
+
+        def set(self, s, o, v):
+            self.data.setdefault(s, {})[o] = str(v)
+
+        def save(self):
+            print(f"DummyCM saved: {self.data}")
+
+        def get_raw_config_parser(self):
+            return None
     app =QApplication (sys .argv )
     if not os .path .exists ('config.ini'):
         print ("Creating dummy config.ini for testing.")
-        dummy_cfg_writer =DummyCM ('config.ini')
-        dummy_cfg_writer .set ('API','ocr_provider','gemini')
-        dummy_cfg_writer .set ('API','translation_provider','gemini')
-        dummy_cfg_writer .set ('LLMImagePreprocessing','enabled','False')
-        dummy_cfg_writer .set ('LLMImagePreprocessing','upscale_factor','1.5')
-        dummy_cfg_writer .set ('LLMImagePreprocessing','contrast_factor','1.2')
-        dummy_cfg_writer .set ('LLMImagePreprocessing','upscale_resample_method','LANCZOS')
-        dummy_cfg_writer .save ()
-    cfg_manager =DummyCM ('config.ini')
+        dummy_cfg_manager =DummyCM ('config.ini')
+        dummy_cfg_manager .set ('API','ocr_provider','gemini')
+        dummy_cfg_manager .set ('API','translation_provider','gemini')
+        dummy_cfg_manager .set ('GeminiAPI','api_key','TEST_API_KEY')
+        dummy_cfg_manager .set ('GeminiAPI','model_name','gemini-1.5-flash-latest')
+        dummy_cfg_manager .set ('GeminiAPI','source_language','Japanese')
+        dummy_cfg_manager .set ('GeminiAPI','target_language','Chinese')
+        dummy_cfg_manager .set ('LLMImagePreprocessing','enabled','False')
+        dummy_cfg_manager .set ('LLMImagePreprocessing','upscale_factor','1.5')
+        dummy_cfg_manager .set ('LLMImagePreprocessing','contrast_factor','1.2')
+        dummy_cfg_manager .set ('LLMImagePreprocessing','upscale_resample_method','LANCZOS')
+        dummy_cfg_manager .set ('Proxy','enabled','False')
+        dummy_cfg_manager .set ('Proxy','host','127.0.0.1')
+        dummy_cfg_manager .set ('Proxy','port','21524')
+        cfg_manager =dummy_cfg_manager 
+    else :
+        from config_manager import ConfigManager as RealCM 
+        cfg_manager =RealCM ('config.ini')
     dialog =SettingsDialog (cfg_manager )
     dialog .show ()
     sys .exit (app .exec ())
