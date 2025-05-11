@@ -3,6 +3,5 @@ PyQt6
 openai
 google-generativeai
 google-cloud-vision
-paddleocr
 numpy
 requests

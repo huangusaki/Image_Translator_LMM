@@ -37,21 +37,18 @@ DEFAULT_CONFIG ={
 'API':{
 'ocr_provider':'gemini',
 'translation_provider':'gemini',
-'fallback_ocr_provider':'local api (paddleocr)',
+'fallback_ocr_provider':'google cloud vision',
 'fallback_translation_provider':'本地 llm api (sakura)',
 },
 'GeminiAPI':{
 'api_key':'',
 'model_name':'gemini-1.5-flash-latest',
-'gemini_base_url': '',
+'gemini_base_url':'',
 'request_timeout':'60',
 'target_language':'Chinese',
 },
 'GoogleAPI':{
 'service_account_json':'',
-},
-'LocalOcrAPI':{
-'paddle_lang':'japan',
 },
 'LocalTranslationAPI':{
 'translation_url':'http://127.0.0.1:8000/v1/chat/completions',

@@ -97,18 +97,17 @@ class ImageProcessor :
         if not api_key :
             self .last_error ="Gemini API 密钥 (用于 OpenAI 兼容模式) 未在配置中找到。"
             return False 
-        gemini_base_url_config = self.config_manager.get('GeminiAPI', 'gemini_base_url', fallback='').strip()
-        actual_base_url_for_gemini = "https://generativelanguage.googleapis.com/v1beta/openai/" # 默认官方地址
-
-        if gemini_base_url_config:
-            actual_base_url_for_gemini = gemini_base_url_config
-            if not actual_base_url_for_gemini.endswith('/'):
-                actual_base_url_for_gemini += '/'
+        gemini_base_url_config =self .config_manager .get ('GeminiAPI','gemini_base_url',fallback ='').strip ()
+        actual_base_url_for_gemini ="https://generativelanguage.googleapis.com/v1beta/openai/"
+        if gemini_base_url_config :
+            actual_base_url_for_gemini =gemini_base_url_config 
+            if not actual_base_url_for_gemini .endswith ('/'):
+                actual_base_url_for_gemini +='/'
         try :
             if self .openai_client is None :
                 self .openai_client =OpenAI (
                 api_key =api_key ,
-                base_url =actual_base_url_for_gemini
+                base_url =actual_base_url_for_gemini 
                 )
             return True 
         except Exception as e :
@@ -319,7 +318,7 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
                         messages =messages_payload ,
                         timeout =float (request_timeout_seconds ),
                         reasoning_effort ="high",
-                        temperature = 1.0 
+                        temperature =1.0 
                         )
                         raw_response_text =""
                         if response .choices and response .choices [0 ].message and response .choices [0 ].message .content :
@@ -379,7 +378,7 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
         run_fallback_ocr =False 
         if not intermediate_blocks_for_processing and gemini_multimodal_attempted and self .last_error :
             _report_progress (42 ,f"Gemini (OpenAI兼容模式) 处理失败或未返回结果 ({self.last_error})，尝试回退 OCR。")
-            run_fallback_ocr =False 
+            run_fallback_ocr =True 
         elif ocr_main_provider_pref !='gemini':
             _report_progress (45 ,f"主要 OCR 提供者 ('{ocr_main_provider_pref}') 不是 Gemini。准备执行配置的 OCR...")
             run_fallback_ocr =True 
@@ -387,7 +386,7 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
             _report_progress (45 ,"执行回退 OCR 流程...")
             if gemini_multimodal_attempted :
                 self .last_error =None 
-            fallback_ocr_provider_name =self .config_manager .get ('API','fallback_ocr_provider','local api (paddleocr)')
+            fallback_ocr_provider_name =self .config_manager .get ('API','fallback_ocr_provider','google cloud vision')
             ocr_provider_instance =get_ocr_provider (self .config_manager ,fallback_ocr_provider_name )
             if ocr_provider_instance :
                 _report_progress (50 ,f"使用备用 OCR: {fallback_ocr_provider_name}...")

@@ -3,13 +3,6 @@ import time
 import json 
 from abc import ABC ,abstractmethod 
 try :
-    from paddleocr import PaddleOCR 
-    PADDLEOCR_AVAILABLE =True 
-except ImportError :
-    PADDLEOCR_AVAILABLE =False 
-    PaddleOCR =None 
-    print ("警告：无法导入 paddleocr。本地 PaddleOCR 功能将不可用。")
-try :
     from google .cloud import vision 
     GOOGLE_VISION_AVAILABLE =True 
 except ImportError :
@@ -35,80 +28,6 @@ class OCRProvider (ABC ):
         pass 
     def get_last_error (self )->str |None :
         return self .last_error 
-class PaddleOCRProvider (OCRProvider ):
-    def __init__ (self ,config_manager ):
-        super ().__init__ (config_manager )
-        self .paddle_ocr_instance =None 
-        self .lang =self .config_manager .get ('LocalOcrAPI','paddle_lang','japan')
-        print (f"*** [PaddleOCRProvider CONSTRUCTOR CALLED] Lang: {self.lang}, PADDLEOCR_AVAILABLE: {PADDLEOCR_AVAILABLE} ***")
-    def _get_instance (self ):
-        print (f"*** [PaddleOCRProvider._get_instance ENTERED] Current instance: {'Exists' if self.paddle_ocr_instance else 'None'} ***")
-        if not PADDLEOCR_AVAILABLE :
-            self .last_error ="PaddleOCR 库未安装。"
-            print ("*** [PaddleOCRProvider._get_instance] PaddleOCR_AVAILABLE is False. Returning None. ***")
-            return None 
-        if self .paddle_ocr_instance is None :
-            print (f"*** [PaddleOCRProvider._get_instance] Attempting to initialize PaddleOCR (lang: {self.lang})... ***")
-            try :
-                self .paddle_ocr_instance =PaddleOCR (use_angle_cls =True ,lang =self .lang ,show_log =True ,use_gpu =False )
-                print (f"*** [PaddleOCRProvider._get_instance] PaddleOCR ({self.lang}) initialized successfully. ***")
-            except Exception as e :
-                self .last_error =f"PaddleOCR 初始化失败: {e}"
-                print (f"*** [PaddleOCRProvider._get_instance] ERROR: PaddleOCR initialization failed: {e} ***")
-                import traceback ;traceback .print_exc ()
-                return None 
-        return self .paddle_ocr_instance 
-    def recognize_text (self ,image_path_or_pil_image )->list [OCRResult ]|None :
-        self .last_error =None 
-        print (f"*** [PaddleOCRProvider.recognize_text CALLED] Input type: {type(image_path_or_pil_image)} ***")
-        ocr_engine =self ._get_instance ()
-        if not ocr_engine :
-            print ("*** [PaddleOCRProvider.recognize_text] OCR engine instance is None. Returning None. ***")
-            return None 
-        input_data =image_path_or_pil_image 
-        if PILLOW_AVAILABLE and isinstance (image_path_or_pil_image ,Image .Image ):
-            import numpy as np 
-            input_data =np .array (image_path_or_pil_image .convert ('RGB'))
-            print ("*** [PaddleOCRProvider.recognize_text] Input is PIL Image, converted to numpy array. ***")
-        elif isinstance (image_path_or_pil_image ,str ):
-             print (f"*** [PaddleOCRProvider.recognize_text] Input is image path: {image_path_or_pil_image} ***")
-        else :
-            print (f"*** [PaddleOCRProvider.recognize_text] Input is of unknown type: {type(image_path_or_pil_image)} ***")
-        try :
-            print (f"*** [PaddleOCRProvider.recognize_text] Calling ocr_engine.ocr()... ***")
-            start_time =time .time ()
-            ocr_output_raw_outer_list =ocr_engine .ocr (input_data ,cls =True )
-            end_time =time .time ()
-            print (f"*** [PaddleOCRProvider.recognize_text] ocr_engine.ocr() call duration: {end_time - start_time:.2f}s ***")
-            print (f"*** [PaddleOCRProvider.recognize_text] Raw PaddleOCR output (ocr_output_raw_outer_list): {ocr_output_raw_outer_list} ***")
-            actual_raw_results =[]
-            if ocr_output_raw_outer_list and isinstance (ocr_output_raw_outer_list ,list )and len (ocr_output_raw_outer_list )>0 :
-                if ocr_output_raw_outer_list [0 ]is not None :
-                    actual_raw_results =ocr_output_raw_outer_list [0 ]
-            if not actual_raw_results :
-                print ("*** [PaddleOCRProvider.recognize_text] No actual_raw_results from PaddleOCR. Returning []. ***")
-                return []
-            print (f"*** [PaddleOCRProvider.recognize_text] Data for process_ocr_results_merge_lines: {actual_raw_results} ***")
-            merged_paddle_results =process_ocr_results_merge_lines (actual_raw_results ,lang_hint =self .lang )
-            print (f"*** [PaddleOCRProvider.recognize_text] Merged results: {merged_paddle_results} ***")
-            results =[]
-            for merged_text ,first_vertices in merged_paddle_results :
-                 if first_vertices and len (first_vertices )==4 :
-                     x_coords =[v [0 ]for v in first_vertices ];y_coords =[v [1 ]for v in first_vertices ]
-                     bbox =[min (x_coords ),min (y_coords ),max (x_coords ),max (y_coords )]
-                     if bbox [0 ]<bbox [2 ]and bbox [1 ]<bbox [3 ]:
-                        results .append (OCRResult (text =merged_text ,bbox =bbox ,original_data =first_vertices ))
-                     else :
-                        print (f"    [PaddleOCRProvider.recognize_text] Invalid bbox generated for '{merged_text[:20]}...': {bbox}")
-                 else :
-                     print (f"    [PaddleOCRProvider.recognize_text] Invalid vertices for merged_text '{merged_text[:20]}...': {first_vertices}")
-            print (f"*** [PaddleOCRProvider.recognize_text] Final OCRResult objects count: {len(results)} ***")
-            return results 
-        except Exception as e :
-            self .last_error =f"本地 PaddleOCR 失败: {e}"
-            print (f"*** [PaddleOCRProvider.recognize_text] EXCEPTION: {e} ***")
-            import traceback ;traceback .print_exc ()
-            return None 
 class GoogleVisionOCRProvider (OCRProvider ):
     def __init__ (self ,config_manager ):
         super ().__init__ (config_manager )
@@ -201,18 +120,12 @@ class GoogleVisionOCRProvider (OCRProvider ):
 def get_ocr_provider (config_manager ,provider_name :str )->OCRProvider |None :
     provider_name_lower =provider_name .lower ()
     print (f"*** [get_ocr_provider CALLED] Requested provider: '{provider_name_lower}' ***")
-    if "paddle"in provider_name_lower :
-        print (f"*** [get_ocr_provider] Matched 'paddle'. PADDLEOCR_AVAILABLE: {PADDLEOCR_AVAILABLE}. Attempting to return PaddleOCRProvider. ***")
-        if not PADDLEOCR_AVAILABLE :
-            print (f"*** [get_ocr_provider] PaddleOCR not available, cannot return provider. ***")
-            return None 
-        return PaddleOCRProvider (config_manager )
-    elif "google"in provider_name_lower :
+    if "google"in provider_name_lower :
         print (f"*** [get_ocr_provider] Matched 'google'. GOOGLE_VISION_AVAILABLE: {GOOGLE_VISION_AVAILABLE}. Attempting to return GoogleVisionOCRProvider. ***")
         if not GOOGLE_VISION_AVAILABLE :
             print (f"*** [get_ocr_provider] Google Vision not available, cannot return provider. ***")
             return None 
         return GoogleVisionOCRProvider (config_manager )
     else :
-        print (f"*** [get_ocr_provider] Unknown OCR Provider name: {provider_name}. Returning None. ***")
+        print (f"*** [get_ocr_provider] Unknown or unsupported OCR Provider name: {provider_name}. Returning None. ***")
         return None 

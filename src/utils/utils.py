@@ -68,17 +68,12 @@ def check_dependencies_availability ():
     dependencies ={
     "Pillow":PILLOW_AVAILABLE ,
     "google.generativeai":False ,
-    "paddleocr_lib_present":False ,
     "google-cloud-vision_lib_present":False ,
     "openai_lib":False 
     }
     try :
         import google .generativeai 
         dependencies ["google.generativeai"]=True 
-    except ImportError :pass 
-    try :
-        import paddleocr 
-        dependencies ["paddleocr_lib_present"]=True 
     except ImportError :pass 
     try :
         import google .cloud .vision 
