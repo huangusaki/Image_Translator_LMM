@@ -267,7 +267,7 @@ class InteractiveLabel (QWidget ):
             painter .fillRect (self .rect (),self .palette ().window ())
             if not self .processed_blocks :
                 painter .setPen (Qt .GlobalColor .gray )
-                painter .drawText (self .rect (),Qt .AlignmentFlag .AlignCenter ,"翻译结果将在此处交互显示 (Pillow 渲染)")
+                painter .drawText (self .rect (),Qt .AlignmentFlag .AlignCenter ,"翻译结果")
         bg_img_to_display_scale_x ,bg_img_to_display_scale_y =self ._get_bg_fit_scale_factors ()
         for block in self .processed_blocks :
             block_qpixmap =self ._get_or_render_block_qpixmap (block )
@@ -795,7 +795,7 @@ class MainWindow (QMainWindow ):
         central_widget =QWidget ();main_layout =QVBoxLayout (central_widget )
         main_layout .setContentsMargins (5 ,5 ,5 ,5 );main_layout .setSpacing (5 )
         self .splitter =QSplitter (Qt .Orientation .Horizontal )
-        self .original_preview_area =QLabel ("在此预览原图");self .original_preview_area .setAlignment (Qt .AlignmentFlag .AlignCenter )
+        self .original_preview_area =QLabel ("原图");self .original_preview_area .setAlignment (Qt .AlignmentFlag .AlignCenter )
         self .original_preview_area .setFrameStyle (QFrame .Shape .Panel |QFrame .Shadow .Sunken )
         self .original_preview_area .setMinimumSize (250 ,300 );self .original_preview_area .setWordWrap (True )
         self .splitter .addWidget (self .original_preview_area )
@@ -916,7 +916,7 @@ class MainWindow (QMainWindow ):
     def _reset_image_state (self ,error_message :str |None =None ):
         if error_message :QMessageBox .warning (self ,"加载错误",error_message )
         self .original_pil_for_display =None ;self .current_image_path =None 
-        self .original_preview_area .clear ();self .original_preview_area .setText ("在此预览原图")
+        self .original_preview_area .clear ();self .original_preview_area .setText ("原图")
         self .interactive_translate_area .clear_all ()
         if self .text_detail_panel :self .text_detail_panel .clear_texts ()
         self .translate_button .setEnabled (False );self .download_button .setEnabled (False )
