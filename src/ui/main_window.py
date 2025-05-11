@@ -994,13 +994,20 @@ class MainWindow (QMainWindow ):
         dialog =GlossarySettingsDialog (self .config_manager ,self )
         if dialog .exec ():self .config_manager .save ();QMessageBox .information (self ,"设置","术语表设置已保存。")
     @pyqtSlot ()
+    def _handle_text_style_settings_applied_live (self ):
+        self .config_manager .save ()
+        self .interactive_translate_area .reload_style_configs ()
+        self .interactive_translate_area ._invalidate_block_cache ()
+    @pyqtSlot ()
     def _on_open_text_style_settings (self ):
         dialog =TextStyleSettingsDialog (self .config_manager ,self )
-        if dialog .exec ():
+        dialog .settings_applied .connect (self ._handle_text_style_settings_applied_live )
+        result =dialog .exec ()
+        if result ==QDialog .DialogCode .Accepted :
             self .config_manager .save ()
             self .interactive_translate_area .reload_style_configs ()
             self .interactive_translate_area ._invalidate_block_cache ()
-            QMessageBox .information (self ,"设置","文本样式设置已保存。")
+            QMessageBox .information (self ,"设置","文本样式设置已保存并应用。")
     def _handle_error_message (self ,title :str ,message :str ,informative_text :str ="",show_settings_option :bool =False ):
         msg_box =QMessageBox (self )
         msg_box .setIcon (QMessageBox .Icon .Warning if "警告"in title else QMessageBox .Icon .Critical )

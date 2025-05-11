@@ -57,6 +57,12 @@ DEFAULT_CONFIG ={
 'type':'http',
 'host':'127.0.0.1',
 'port':'21524',
+},
+'LLMImagePreprocessing':{
+'enabled':'False',
+'upscale_factor':'1.5',
+'contrast_factor':'1.2',
+'upscale_resample_method':'LANCZOS',
 }
 }
 class ConfigManager :

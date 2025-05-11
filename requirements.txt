@@ -1,7 +1,8 @@
-Pillow
 PyQt6
+Pillow
 openai
+numpy
 google-generativeai
 google-cloud-vision
-numpy
 requests
+google-api-core

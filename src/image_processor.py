@@ -19,6 +19,12 @@ except ImportError :
     APITimeoutError =None 
     APIError =None 
     print ("警告: 未安装 openai 库。Gemini (OpenAI兼容模式) 功能将不可用。")
+try :
+    import numpy as np 
+    NUMPY_AVAILABLE =True 
+except ImportError :
+    NUMPY_AVAILABLE =False 
+    print ("警告: 未安装 numpy 库。LLM图像对比度增强功能将不可用。")
 class ProcessedBlock :
     def __init__ (self ,original_text :str ,translated_text :str ,bbox :list [int ],
     orientation :str ="horizontal",
@@ -88,6 +94,7 @@ class ImageProcessor :
         return {
         "pillow":PILLOW_AVAILABLE ,
         "openai_lib":OPENAI_LIB_AVAILABLE ,
+        "numpy":NUMPY_AVAILABLE ,
         }
     def _configure_openai_client_if_needed (self )->bool :
         if not self .dependencies ["openai_lib"]:
@@ -216,6 +223,47 @@ class ImageProcessor :
             self .last_error =f"使用 Pillow 加载图片失败: {e}";
             _report_progress (100 ,f"错误: {self.last_error}");return None 
         if _check_cancelled ():return None 
+        pil_image_for_llm =pil_image_original .copy ()
+        preprocess_enabled =self .config_manager .getboolean ('LLMImagePreprocessing','enabled',fallback =False )
+        if preprocess_enabled and PILLOW_AVAILABLE :
+            _report_progress (6 ,"LLM图像预处理...")
+            upscale_factor_conf =self .config_manager .getfloat ('LLMImagePreprocessing','upscale_factor',fallback =1.0 )
+            contrast_factor_conf =self .config_manager .getfloat ('LLMImagePreprocessing','contrast_factor',fallback =1.0 )
+            resample_method_str =self .config_manager .get ('LLMImagePreprocessing','upscale_resample_method','LANCZOS').upper ()
+            resample_filter =Image .Resampling .LANCZOS 
+            if resample_method_str =='NEAREST':resample_filter =Image .Resampling .NEAREST 
+            elif resample_method_str =='BILINEAR':resample_filter =Image .Resampling .BILINEAR 
+            elif resample_method_str =='BICUBIC':resample_filter =Image .Resampling .BICUBIC 
+            try :
+                if upscale_factor_conf >1.0 and upscale_factor_conf !=1.0 :
+                    original_llm_width ,original_llm_height =pil_image_for_llm .size 
+                    new_llm_width =int (original_llm_width *upscale_factor_conf )
+                    new_llm_height =int (original_llm_height *upscale_factor_conf )
+                    pil_image_for_llm =pil_image_for_llm .resize ((new_llm_width ,new_llm_height ),resample_filter )
+                    _report_progress (7 ,f"LLM图像已放大 (至 {new_llm_width}x{new_llm_height})")
+                if contrast_factor_conf !=1.0 and NUMPY_AVAILABLE :
+                    img_array =np .array (pil_image_for_llm ).astype (np .float32 )
+                    if img_array .ndim ==3 and img_array .shape [2 ]==4 :
+                        rgb_channels =img_array [:,:,:3 ]
+                        alpha_channel =img_array [:,:,3 ]
+                        rgb_channels =contrast_factor_conf *(rgb_channels -128.0 )+128.0 
+                        rgb_channels =np .clip (rgb_channels ,0 ,255 )
+                        processed_img_array =np .dstack ((rgb_channels ,alpha_channel ))
+                        pil_image_for_llm =Image .fromarray (processed_img_array .astype (np .uint8 ),'RGBA')
+                    elif img_array .ndim ==3 and img_array .shape [2 ]==3 :
+                        img_array =contrast_factor_conf *(img_array -128.0 )+128.0 
+                        img_array =np .clip (img_array ,0 ,255 )
+                        pil_image_for_llm =Image .fromarray (img_array .astype (np .uint8 ),'RGB')
+                    elif img_array .ndim ==2 :
+                        img_array =contrast_factor_conf *(img_array -128.0 )+128.0 
+                        img_array =np .clip (img_array ,0 ,255 )
+                        pil_image_for_llm =Image .fromarray (img_array .astype (np .uint8 ),'L')
+                    _report_progress (8 ,f"LLM图像对比度已调整 (系数: {contrast_factor_conf})")
+                elif contrast_factor_conf !=1.0 and not NUMPY_AVAILABLE :
+                    _report_progress (8 ,f"警告: Numpy未安装，跳过LLM图像对比度调整。")
+            except Exception as e_preprocess :
+                _report_progress (8 ,f"警告: LLM图像预处理失败: {e_preprocess}")
+                pil_image_for_llm =pil_image_original .copy ()
         intermediate_blocks_for_processing :list [dict ]=[]
         _report_progress (10 ,"使用 Gemini (OpenAI 兼容模式) 进行OCR和翻译...")
         if not self .dependencies ["openai_lib"]:
@@ -279,8 +327,8 @@ IMPORTANT: When translating, strictly adhere to the following glossary (source_t
 5.  **No Text Case:** Return `[]` if no qualifying text is found.
 6.  **JSON Purity:** Output only the pure JSON string.
 """
-            if pil_image_original is None :raise ValueError ("PIL Image is None before encoding.")
-            base64_image_string =self ._encode_pil_image_to_base64 (pil_image_original ,image_format ="PNG")
+            if pil_image_for_llm is None :raise ValueError ("PIL Image for LLM is None before encoding.")
+            base64_image_string =self ._encode_pil_image_to_base64 (pil_image_for_llm ,image_format ="PNG")
             messages_payload =[{"role":"user","content":[
             {"type":"text","text":prompt_text_for_api },
             {"type":"image_url","image_url":{"url":f"data:image/png;base64,{base64_image_string}"}}]}]

@@ -7,6 +7,7 @@ QLineEdit ,QPushButton ,QCheckBox ,QFileDialog ,QWidget ,QSpacerItem ,
 QSizePolicy ,QComboBox ,QTextEdit ,QMessageBox ,QListWidget ,QListWidgetItem 
 )
 from PyQt6 .QtCore import Qt ,pyqtSlot 
+from PIL import Image 
 class SettingsDialog (QDialog ):
     def __init__ (self ,config_manager ,parent =None ):
         super ().__init__ (parent )
@@ -63,7 +64,7 @@ class SettingsDialog (QDialog ):
         self .gemini_group =QGroupBox ("Gemini API 设置")
         self .gemini_group .setVisible (False )
         gemini_main_layout =QVBoxLayout (self .gemini_group )
-        self .gemini_group .setSizePolicy (QSizePolicy .Policy .Preferred ,QSizePolicy .Policy .Fixed )
+        self .gemini_group .setSizePolicy (QSizePolicy .Policy .Preferred ,QSizePolicy .Policy .Preferred )
         gemini_key_layout =QHBoxLayout ()
         gemini_key_label =QLabel ("Gemini API Key:")
         self .gemini_api_key_edit =QLineEdit ()
@@ -101,6 +102,38 @@ class SettingsDialog (QDialog ):
         gemini_timeout_layout .addWidget (gemini_timeout_label )
         gemini_timeout_layout .addWidget (self .gemini_timeout_edit ,0 )
         gemini_main_layout .addLayout (gemini_timeout_layout )
+        self .llm_preprocess_group =QGroupBox ("LLM 图像预处理 (仅影响发送给模型的图像)")
+        llm_preprocess_layout =QVBoxLayout (self .llm_preprocess_group )
+        self .llm_preprocess_group .setSizePolicy (QSizePolicy .Policy .Preferred ,QSizePolicy .Policy .Fixed )
+        self .llm_preprocess_enabled_checkbox =QCheckBox ("启用图像预处理")
+        llm_preprocess_layout .addWidget (self .llm_preprocess_enabled_checkbox )
+        self .llm_preprocess_details_widget =QWidget ()
+        self .llm_preprocess_details_widget .setVisible (False )
+        llm_preprocess_details_form_layout =QVBoxLayout (self .llm_preprocess_details_widget )
+        llm_preprocess_details_form_layout .setContentsMargins (20 ,0 ,0 ,0 )
+        upscale_layout =QHBoxLayout ()
+        upscale_label =QLabel ("放大倍数:")
+        self .llm_upscale_factor_edit =QLineEdit ()
+        self .llm_upscale_factor_edit .setPlaceholderText ("例如: 1.5 (1.0 表示不放大)")
+        upscale_layout .addWidget (upscale_label )
+        upscale_layout .addWidget (self .llm_upscale_factor_edit ,1 )
+        llm_preprocess_details_form_layout .addLayout (upscale_layout )
+        resample_layout =QHBoxLayout ()
+        resample_label =QLabel ("放大采样方法:")
+        self .llm_resample_method_combo =QComboBox ()
+        self .llm_resample_method_combo .addItems (["LANCZOS","BICUBIC","BILINEAR","NEAREST"])
+        resample_layout .addWidget (resample_label )
+        resample_layout .addWidget (self .llm_resample_method_combo ,1 )
+        llm_preprocess_details_form_layout .addLayout (resample_layout )
+        contrast_layout =QHBoxLayout ()
+        contrast_label =QLabel ("对比度系数:")
+        self .llm_contrast_factor_edit =QLineEdit ()
+        self .llm_contrast_factor_edit .setPlaceholderText ("例如: 1.2 (1.0 表示不调整)")
+        contrast_layout .addWidget (contrast_label )
+        contrast_layout .addWidget (self .llm_contrast_factor_edit ,1 )
+        llm_preprocess_details_form_layout .addLayout (contrast_layout )
+        llm_preprocess_layout .addWidget (self .llm_preprocess_details_widget )
+        gemini_main_layout .addWidget (self .llm_preprocess_group )
         main_layout .addWidget (self .gemini_group )
         proxy_group =QGroupBox ("代理设置 (主要供 Google Vision, 以及尝试为 Gemini 设置环境变量)")
         proxy_layout =QVBoxLayout ()
@@ -143,7 +176,17 @@ class SettingsDialog (QDialog ):
         self .proxy_checkbox .setChecked (proxy_enabled )
         self .proxy_host_edit .setText (self .config_manager .get ('Proxy','host',fallback ='127.0.0.1'))
         self .proxy_port_edit .setText (self .config_manager .get ('Proxy','port',fallback ='21524'))
+        llm_preprocess_enabled =self .config_manager .getboolean ('LLMImagePreprocessing','enabled',fallback =False )
+        self .llm_preprocess_enabled_checkbox .setChecked (llm_preprocess_enabled )
+        self .llm_upscale_factor_edit .setText (self .config_manager .get ('LLMImagePreprocessing','upscale_factor',fallback ='1.0'))
+        self .llm_contrast_factor_edit .setText (self .config_manager .get ('LLMImagePreprocessing','contrast_factor',fallback ='1.0'))
+        current_resample_method =self .config_manager .get ('LLMImagePreprocessing','upscale_resample_method',fallback ='LANCZOS').upper ()
+        if current_resample_method in [item .upper ()for item in ["LANCZOS","BICUBIC","BILINEAR","NEAREST"]]:
+            self .llm_resample_method_combo .setCurrentText (current_resample_method )
+        else :
+            self .llm_resample_method_combo .setCurrentText ("LANCZOS")
         self ._toggle_proxy_details (Qt .CheckState .Checked .value if proxy_enabled else Qt .CheckState .Unchecked .value )
+        self ._toggle_llm_preprocess_details (Qt .CheckState .Checked .value if llm_preprocess_enabled else Qt .CheckState .Unchecked .value )
         self ._update_provider_sections_visibility ()
     def _save_settings (self ):
         self .config_manager .set ('API','ocr_provider','gemini'if self .primary_ocr_combo .currentIndex ()==0 else 'fallback')
@@ -162,11 +205,16 @@ class SettingsDialog (QDialog ):
         self .config_manager .set ('Proxy','type','http')
         self .config_manager .set ('Proxy','host',self .proxy_host_edit .text ())
         self .config_manager .set ('Proxy','port',self .proxy_port_edit .text ())
+        self .config_manager .set ('LLMImagePreprocessing','enabled',str (self .llm_preprocess_enabled_checkbox .isChecked ()))
+        self .config_manager .set ('LLMImagePreprocessing','upscale_factor',self .llm_upscale_factor_edit .text ().strip ()or '1.0')
+        self .config_manager .set ('LLMImagePreprocessing','contrast_factor',self .llm_contrast_factor_edit .text ().strip ()or '1.0')
+        self .config_manager .set ('LLMImagePreprocessing','upscale_resample_method',self .llm_resample_method_combo .currentText ())
         return True 
     def _connect_signals (self ):
         self .save_button .clicked .connect (self .on_save )
         self .cancel_button .clicked .connect (self .reject )
         self .proxy_checkbox .stateChanged .connect (self ._toggle_proxy_details )
+        self .llm_preprocess_enabled_checkbox .stateChanged .connect (self ._toggle_llm_preprocess_details )
         self .google_key_button .clicked .connect (self ._browse_google_key )
         self .primary_ocr_combo .currentIndexChanged .connect (self ._update_provider_sections_visibility )
         self .fallback_ocr_provider_combo .currentIndexChanged .connect (self ._update_provider_sections_visibility )
@@ -179,6 +227,16 @@ class SettingsDialog (QDialog ):
         elif isinstance (state ,bool ):
             is_checked =state 
         self .proxy_details_widget .setVisible (is_checked )
+        self .adjustSize ()
+    def _toggle_llm_preprocess_details (self ,state ):
+        is_checked =False 
+        if isinstance (state ,Qt .CheckState ):
+            is_checked =(state ==Qt .CheckState .Checked )
+        elif isinstance (state ,int ):
+            is_checked =(state ==Qt .CheckState .Checked .value )
+        elif isinstance (state ,bool ):
+            is_checked =state 
+        self .llm_preprocess_details_widget .setVisible (is_checked )
         self .adjustSize ()
     def _update_provider_sections_visibility (self ):
         is_gemini_ocr_primary =(self .primary_ocr_combo .currentIndex ()==0 )
@@ -223,6 +281,17 @@ class SettingsDialog (QDialog ):
             QMessageBox .warning (self ,"输入错误","Gemini Base URL 如果填写，必须以 http:// 或 https:// 开头。")
             self .gemini_base_url_edit .setFocus ()
             return 
+        if self .llm_preprocess_enabled_checkbox .isChecked ():
+            try :
+                upscale_f =float (self .llm_upscale_factor_edit .text ().strip ())
+                if upscale_f <0.1 :raise ValueError ("Upscale factor too small")
+            except ValueError :
+                QMessageBox .warning (self ,"输入错误","LLM 图像放大倍数必须是一个有效的正数 (例如 1.0, 1.5)。");self .llm_upscale_factor_edit .setFocus ();return 
+            try :
+                contrast_f =float (self .llm_contrast_factor_edit .text ().strip ())
+                if contrast_f <0.1 :raise ValueError ("Contrast factor too small")
+            except ValueError :
+                QMessageBox .warning (self ,"输入错误","LLM 图像对比度系数必须是一个有效的正数 (例如 1.0, 1.2)。");self .llm_contrast_factor_edit .setFocus ();return 
         if self ._save_settings ():
             if self .proxy_checkbox .isChecked ():
                 proxy_host =self .proxy_host_edit .text ()
@@ -254,6 +323,10 @@ if __name__ =='__main__':
         dummy_cfg_writer =DummyCM ('config.ini')
         dummy_cfg_writer .set ('API','ocr_provider','gemini')
         dummy_cfg_writer .set ('API','translation_provider','gemini')
+        dummy_cfg_writer .set ('LLMImagePreprocessing','enabled','False')
+        dummy_cfg_writer .set ('LLMImagePreprocessing','upscale_factor','1.5')
+        dummy_cfg_writer .set ('LLMImagePreprocessing','contrast_factor','1.2')
+        dummy_cfg_writer .set ('LLMImagePreprocessing','upscale_resample_method','LANCZOS')
         dummy_cfg_writer .save ()
     cfg_manager =DummyCM ('config.ini')
     dialog =SettingsDialog (cfg_manager )
