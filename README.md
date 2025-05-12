@@ -14,9 +14,10 @@
 1.  下载项目代码
 2.  解压，进入有requirements.txt的目录使用powershell输入命令:pip install -r requirements.txt
 4.  进入main.py的目录在powershell中运行命令: python main.py
-5.  配置API，OCR和翻译都选gemini，默认的就行，模型推荐：gemini-2.5-flash-preview-04-17-thinking
-6.  默认base_url:https://generativelanguage.googleapis.com/v1beta/openai/
-7.  代理需要设置你自己的端口号以及地址
+5.  配置API，OCR和翻译都选gemini，默认的就行，模型推荐：有钱gemini-2.5-pro-preview-05-06,没钱gemini-2.5-flash-preview-04-17-thinking
+6.  KEY：https://aistudio.google.com/ 右上角获取
+7.  默认base_url:https://generativelanguage.googleapis.com/v1beta/openai/
+8.  代理需要设置你自己的端口号以及地址
 
 *   **效果预览:**
     ![示例图片 4](sample/4.png)
