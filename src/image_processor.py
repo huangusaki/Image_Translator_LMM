@@ -324,7 +324,7 @@ Follow these steps precisely:
         *   **Crucially, DO NOT include non-text elements** like speech bubble outlines, tails, or large empty areas of a dialogue box, unless these are unavoidably intertwined with the text characters. Focus on the text's actual footprint.
         *   Ensure `x_min_norm < x_max_norm` and `y_min_norm < y_max_norm`. The box must have a non-zero area.
     d.  **Font Size Category:** Classify its visual size relative to the image and other text as: "very_small", "small", "medium", "large", or "very_large".
-    e.  **Translation:** Translate the extracted {source_language_from_config} text into fluent and natural {target_language}.
+    e.  **Translation:** Translate the extracted {source_language_from_config} text into fluent and natural {target_language}. **Pay attention to the visual context (scene, character expressions) and dialogue flow/atmosphere to ensure the translation accurately reflects the original tone, mood, and nuance, maintaining translation accuracy.**
 {glossary_instructions}
 4.  **Output Format (Strictly JSON):**
     *   Return a JSON list of objects. Each object represents one processed text block.

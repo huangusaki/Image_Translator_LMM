@@ -10,7 +10,7 @@ class TextStyleSettingsDialog (QDialog ):
     settings_applied =pyqtSignal ()
     def __init__ (self ,config_manager ,parent =None ):
         super ().__init__ (parent )
-        self .setWindowTitle ("文本样式设置")
+        self .setWindowTitle ("文本样式设置（全局）")
         self .config_manager =config_manager 
         self .setMinimumWidth (500 )
         self ._init_ui ()

@@ -24,9 +24,9 @@ class SettingsDialog (QDialog ):
         ocr_layout =QVBoxLayout (self .ocr_group )
         self .ocr_group .setSizePolicy (QSizePolicy .Policy .Preferred ,QSizePolicy .Policy .Preferred )
         primary_ocr_layout =QHBoxLayout ()
-        primary_ocr_label =QLabel ("主要 OCR Provider:")
+        primary_ocr_label =QLabel ("OCR:")
         self .primary_ocr_combo =QComboBox ()
-        self .primary_ocr_combo .addItems (["Gemini (推荐)","使用回退 OCR"])
+        self .primary_ocr_combo .addItems (["Gemini (推荐)","默认gemini别动，剩下的没做"])
         primary_ocr_layout .addWidget (primary_ocr_label )
         primary_ocr_layout .addWidget (self .primary_ocr_combo ,1 )
         ocr_layout .addLayout (primary_ocr_layout )
@@ -55,8 +55,8 @@ class SettingsDialog (QDialog ):
         trans_layout =QVBoxLayout (self .trans_group )
         self .trans_group .setSizePolicy (QSizePolicy .Policy .Preferred ,QSizePolicy .Policy .Fixed )
         primary_trans_layout =QHBoxLayout ()
-        primary_trans_label =QLabel ("翻译Provider:")
-        self .primary_trans_fixed_label =QLabel ("Gemini (与OCR一同处理)")
+        primary_trans_label =QLabel ("翻译:")
+        self .primary_trans_fixed_label =QLabel ("Gemini")
         primary_trans_layout .addWidget (primary_trans_label )
         primary_trans_layout .addWidget (self .primary_trans_fixed_label ,1 )
         trans_layout .addLayout (primary_trans_layout )
@@ -68,7 +68,7 @@ class SettingsDialog (QDialog ):
         gemini_key_layout =QHBoxLayout ()
         gemini_key_label =QLabel ("Gemini API Key:")
         self .gemini_api_key_edit =QLineEdit ()
-        self .gemini_api_key_edit .setPlaceholderText ("粘贴你的 Gemini API Key")
+        self .gemini_api_key_edit .setPlaceholderText ("粘贴你的 Gemini API Key，必填")
         self .gemini_api_key_edit .setEchoMode (QLineEdit .EchoMode .Password )
         gemini_key_layout .addWidget (gemini_key_label );gemini_key_layout .addWidget (self .gemini_api_key_edit ,1 )
         gemini_main_layout .addLayout (gemini_key_layout )
@@ -79,7 +79,7 @@ class SettingsDialog (QDialog ):
         gemini_model_layout .addWidget (gemini_model_label );gemini_model_layout .addWidget (self .gemini_model_edit ,1 )
         gemini_main_layout .addLayout (gemini_model_layout )
         gemini_base_url_layout =QHBoxLayout ()
-        gemini_base_url_label =QLabel ("Gemini Base URL (可选):")
+        gemini_base_url_label =QLabel ("Gemini Base URL:")
         self .gemini_base_url_edit =QLineEdit ()
         self .gemini_base_url_edit .setPlaceholderText ("例如: https://generativelanguage.googleapis.com/v1beta/openai/")
         self .gemini_base_url_edit .setToolTip (
@@ -91,14 +91,14 @@ class SettingsDialog (QDialog ):
         gemini_source_lang_layout =QHBoxLayout ()
         gemini_source_lang_label =QLabel ("Gemini 源语言:")
         self .gemini_source_lang_edit =QLineEdit ()
-        self .gemini_source_lang_edit .setPlaceholderText ("例如: Japanese, English, Korean")
+        self .gemini_source_lang_edit .setPlaceholderText ("例如: Japanese, English, Korean，直接填中文（如：粤语）也行")
         gemini_source_lang_layout .addWidget (gemini_source_lang_label )
         gemini_source_lang_layout .addWidget (self .gemini_source_lang_edit ,1 )
         gemini_main_layout .addLayout (gemini_source_lang_layout )
         gemini_target_lang_layout =QHBoxLayout ()
         gemini_target_lang_label =QLabel ("Gemini 目标翻译语言:")
         self .gemini_target_lang_edit =QLineEdit ()
-        self .gemini_target_lang_edit .setPlaceholderText ("例如: Chinese, English")
+        self .gemini_target_lang_edit .setPlaceholderText ("例如: Chinese, English，直接填中文（如：粤语）也行")
         gemini_target_lang_layout .addWidget (gemini_target_lang_label )
         gemini_target_lang_layout .addWidget (self .gemini_target_lang_edit ,1 )
         gemini_main_layout .addLayout (gemini_target_lang_layout )
@@ -109,10 +109,10 @@ class SettingsDialog (QDialog ):
         gemini_timeout_layout .addWidget (gemini_timeout_label )
         gemini_timeout_layout .addWidget (self .gemini_timeout_edit ,0 )
         gemini_main_layout .addLayout (gemini_timeout_layout )
-        self .llm_preprocess_group =QGroupBox ("LLM 图像预处理 (仅影响发送给模型的图像)")
+        self .llm_preprocess_group =QGroupBox ("LLM 图像预处理 (不影响翻译后的图)")
         llm_preprocess_layout =QVBoxLayout (self .llm_preprocess_group )
         self .llm_preprocess_group .setSizePolicy (QSizePolicy .Policy .Preferred ,QSizePolicy .Policy .Fixed )
-        self .llm_preprocess_enabled_checkbox =QCheckBox ("启用图像预处理")
+        self .llm_preprocess_enabled_checkbox =QCheckBox ("启用图像预处理（或许可以小幅增加定位和翻译质量）")
         llm_preprocess_layout .addWidget (self .llm_preprocess_enabled_checkbox )
         self .llm_preprocess_details_widget =QWidget ()
         self .llm_preprocess_details_widget .setVisible (False )
@@ -121,7 +121,7 @@ class SettingsDialog (QDialog ):
         upscale_layout =QHBoxLayout ()
         upscale_label =QLabel ("放大倍数:")
         self .llm_upscale_factor_edit =QLineEdit ()
-        self .llm_upscale_factor_edit .setPlaceholderText ("例如: 1.5 (1.0 表示不放大)")
+        self .llm_upscale_factor_edit .setPlaceholderText ("太大会把文本拆分得很碎，推荐不超过1.5，推荐LANCZOS算法")
         upscale_layout .addWidget (upscale_label )
         upscale_layout .addWidget (self .llm_upscale_factor_edit ,1 )
         llm_preprocess_details_form_layout .addLayout (upscale_layout )
@@ -135,14 +135,14 @@ class SettingsDialog (QDialog ):
         contrast_layout =QHBoxLayout ()
         contrast_label =QLabel ("对比度系数:")
         self .llm_contrast_factor_edit =QLineEdit ()
-        self .llm_contrast_factor_edit .setPlaceholderText ("例如: 1.2 (1.0 表示不调整)")
+        self .llm_contrast_factor_edit .setPlaceholderText ("太大会让识别变得很困难，推荐不超过1.3")
         contrast_layout .addWidget (contrast_label )
         contrast_layout .addWidget (self .llm_contrast_factor_edit ,1 )
         llm_preprocess_details_form_layout .addLayout (contrast_layout )
         llm_preprocess_layout .addWidget (self .llm_preprocess_details_widget )
         gemini_main_layout .addWidget (self .llm_preprocess_group )
         main_layout .addWidget (self .gemini_group )
-        proxy_group =QGroupBox ("代理设置 (主要供 Google Vision, 以及尝试为 Gemini 设置环境变量)")
+        proxy_group =QGroupBox ("代理设置 (如果能直连gemini就不用管了)")
         proxy_layout =QVBoxLayout ()
         proxy_group .setSizePolicy (QSizePolicy .Policy .Preferred ,QSizePolicy .Policy .Fixed )
         self .proxy_checkbox =QCheckBox ("启用代理")
@@ -327,46 +327,39 @@ class SettingsDialog (QDialog ):
                 print ("SettingsDialog: Proxy disabled. Ensured related env vars potentially set by app are cleared.")
             self .accept ()
 if __name__ =='__main__':
-    class DummyCM:
-        def __init__(self, path):
-            self.path = path  
-            self.data = {}    
-
-        def get(self, s, o, fallback=None):
-            return self.data.get(s, {}).get(o, fallback)
-
-        def getboolean(self, s, o, fallback=False):
-            val_str = self.get(s, o, None)
-            if val_str is None:
-                return fallback
-            return val_str.lower() in ('true', '1', 'yes', 'on')
-
-        def getint(self, s, o, fallback=0):
-            val_str = self.get(s, o, None)
-            if val_str is None:
-                return fallback
-            try:
-                return int(val_str)
-            except (ValueError, TypeError):
-                return fallback
-
-        def getfloat(self, s, o, fallback=0.0):
-            val_str = self.get(s, o, None)
-            if val_str is None:
-                return fallback
-            try:
-                return float(val_str)
-            except (ValueError, TypeError):
-                return fallback
-
-        def set(self, s, o, v):
-            self.data.setdefault(s, {})[o] = str(v)
-
-        def save(self):
-            print(f"DummyCM saved: {self.data}")
-
-        def get_raw_config_parser(self):
-            return None
+    class DummyCM :
+        def __init__ (self ,path ):
+            self .path =path 
+            self .data ={}
+        def get (self ,s ,o ,fallback =None ):
+            return self .data .get (s ,{}).get (o ,fallback )
+        def getboolean (self ,s ,o ,fallback =False ):
+            val_str =self .get (s ,o ,None )
+            if val_str is None :
+                return fallback 
+            return val_str .lower ()in ('true','1','yes','on')
+        def getint (self ,s ,o ,fallback =0 ):
+            val_str =self .get (s ,o ,None )
+            if val_str is None :
+                return fallback 
+            try :
+                return int (val_str )
+            except (ValueError ,TypeError ):
+                return fallback 
+        def getfloat (self ,s ,o ,fallback =0.0 ):
+            val_str =self .get (s ,o ,None )
+            if val_str is None :
+                return fallback 
+            try :
+                return float (val_str )
+            except (ValueError ,TypeError ):
+                return fallback 
+        def set (self ,s ,o ,v ):
+            self .data .setdefault (s ,{})[o ]=str (v )
+        def save (self ):
+            print (f"DummyCM saved: {self.data}")
+        def get_raw_config_parser (self ):
+            return None 
     app =QApplication (sys .argv )
     if not os .path .exists ('config.ini'):
         print ("Creating dummy config.ini for testing.")

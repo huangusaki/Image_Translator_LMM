@@ -462,7 +462,12 @@ v_manual_break_extra_px :int =0
         except Exception as e_paste :
             print (f"Fallback paste also failed for block: {e_paste}")
 def draw_processed_blocks_pil (pil_image_original :Image .Image ,processed_blocks :list ,config_manager :ConfigManager )->Image .Image |None :
+    """
+    Draws processed text blocks onto a copy of the original PIL image,
+    respecting per-block style overrides.
+    """
     if not PILLOW_AVAILABLE or not pil_image_original :
+        print ("Warning (draw_processed_blocks_pil): Pillow not available or no original image.")
         return pil_image_original 
     if not processed_blocks :
         return pil_image_original .copy ()if pil_image_original else None 
@@ -475,7 +480,7 @@ def draw_processed_blocks_pil (pil_image_original :Image .Image ,processed_block
         text_pad_conf =config_manager .getint ('UI','text_padding',3 )
         main_color_str =config_manager .get ('UI','text_main_color','255,255,255,255')
         outline_color_str =config_manager .get ('UI','text_outline_color','0,0,0,255')
-        outline_thick_conf =config_manager .getint ('UI','text_outline_thickness',2 )
+        outline_thick_conf_default =config_manager .getint ('UI','text_outline_thickness',2 )
         bg_color_str =config_manager .get ('UI','text_background_color','0,0,0,128')
         h_char_spacing_conf =config_manager .getint ('UI','h_text_char_spacing_px',0 )
         h_line_spacing_conf =config_manager .getint ('UI','h_text_line_spacing_px',0 )
@@ -483,40 +488,88 @@ def draw_processed_blocks_pil (pil_image_original :Image .Image ,processed_block
         v_col_spacing_conf =config_manager .getint ('UI','v_text_column_spacing_px',0 )
         h_manual_break_extra_conf =config_manager .getint ('UI','h_manual_break_extra_spacing_px',0 )
         v_manual_break_extra_conf =config_manager .getint ('UI','v_manual_break_extra_spacing_px',0 )
-        try :
-            mc_parts =list (map (int ,main_color_str .split (',')))
-            oc_parts =list (map (int ,outline_color_str .split (',')))
-            bc_parts =list (map (int ,bg_color_str .split (',')))
-            main_color_pil =tuple (mc_parts )if len (mc_parts )in [3 ,4 ]else (255 ,255 ,255 ,255 )
-            outline_color_pil =tuple (oc_parts )if len (oc_parts )in [3 ,4 ]else (0 ,0 ,0 ,255 )
-            bg_color_pil =tuple (bc_parts )if len (bc_parts )in [3 ,4 ]else (0 ,0 ,0 ,128 )
-            if len (main_color_pil )==3 :main_color_pil +=(255 ,)
-            if len (outline_color_pil )==3 :outline_color_pil +=(255 ,)
-            if len (bg_color_pil )==3 :bg_color_pil +=(128 ,)
-        except ValueError :
-            main_color_pil =(255 ,255 ,255 ,255 );outline_color_pil =(0 ,0 ,0 ,255 );bg_color_pil =(0 ,0 ,0 ,128 )
+        def _parse_color (color_string ,default_rgba ):
+            try :
+                parts =list (map (int ,color_string .split (',')))
+                if len (parts )==3 :return tuple (parts )+(255 ,)
+                if len (parts )==4 :return tuple (parts )
+            except :pass 
+            return default_rgba 
+        default_main_color_pil =_parse_color (main_color_str ,(255 ,255 ,255 ,255 ))
+        default_outline_color_pil =_parse_color (outline_color_str ,(0 ,0 ,0 ,255 ))
+        default_bg_color_pil =_parse_color (bg_color_str ,(0 ,0 ,0 ,128 ))
         for idx ,block_item in enumerate (processed_blocks ):
             if not hasattr (block_item ,'translated_text')or not block_item .translated_text or not block_item .translated_text .strip ():
                 continue 
-            if not hasattr (block_item ,'font_size_pixels')or not hasattr (block_item ,'bbox'):
-                print (f"Skipping block {idx} due to missing attributes (font_size_pixels or bbox). Block: {block_item}")
-                continue 
-            if not hasattr (block_item ,'orientation'):block_item .orientation ="horizontal"
-            if not hasattr (block_item ,'text_align')or not block_item .text_align :
-                block_item .text_align ="right"if block_item .orientation !="horizontal"else "left"
-            if not hasattr (block_item ,'angle'):block_item .angle =0.0 
-            _draw_single_block_pil (
-            draw_target_image =base_image ,block =block_item ,
-            font_name_config =font_name_conf ,text_main_color_pil =main_color_pil ,
-            text_outline_color_pil =outline_color_pil ,text_bg_color_pil =bg_color_pil ,
-            outline_thickness =outline_thick_conf ,text_padding =text_pad_conf ,
-            h_char_spacing_px =h_char_spacing_conf ,h_line_spacing_px =h_line_spacing_conf ,
-            v_char_spacing_px =v_char_spacing_conf ,v_col_spacing_px =v_col_spacing_conf ,
+            if not hasattr (block_item ,'bbox')or not block_item .bbox or len (block_item .bbox )!=4 :
+                 print (f"Skipping block {idx} ('{block_item.translated_text[:10]}...'): Invalid or missing bbox.")
+                 continue 
+            if not hasattr (block_item ,'font_size_pixels')or not block_item .font_size_pixels or block_item .font_size_pixels <=0 :
+                 print (f"Skipping block {idx} ('{block_item.translated_text[:10]}...'): Invalid or missing font_size_pixels.")
+                 continue 
+            main_color_to_use =default_main_color_pil 
+            if hasattr (block_item ,'main_color')and block_item .main_color is not None :
+                if isinstance (block_item .main_color ,tuple )and len (block_item .main_color )==4 :
+                    main_color_to_use =block_item .main_color 
+            outline_color_to_use =default_outline_color_pil 
+            if hasattr (block_item ,'outline_color')and block_item .outline_color is not None :
+                 if isinstance (block_item .outline_color ,tuple )and len (block_item .outline_color )==4 :
+                    outline_color_to_use =block_item .outline_color 
+            bg_color_to_use =default_bg_color_pil 
+            if hasattr (block_item ,'background_color')and block_item .background_color is not None :
+                 if isinstance (block_item .background_color ,tuple )and len (block_item .background_color )==4 :
+                    bg_color_to_use =block_item .background_color 
+            thickness_to_use =outline_thick_conf_default 
+            if hasattr (block_item ,'outline_thickness')and block_item .outline_thickness is not None :
+                 if isinstance (block_item .outline_thickness ,int )and block_item .outline_thickness >=0 :
+                     thickness_to_use =block_item .outline_thickness 
+            orientation =getattr (block_item ,'orientation','horizontal')
+            text_align =getattr (block_item ,'text_align','left'if orientation =='horizontal'else 'right')
+            angle =getattr (block_item ,'angle',0.0 )
+            rendered_block_content_pil =_render_single_block_pil_for_preview (
+            block =block_item ,
+            font_name_config =font_name_conf ,
+            text_main_color_pil =main_color_to_use ,
+            text_outline_color_pil =outline_color_to_use ,
+            text_bg_color_pil =bg_color_to_use ,
+            outline_thickness =thickness_to_use ,
+            text_padding =text_pad_conf ,
+            h_char_spacing_px =h_char_spacing_conf ,
+            h_line_spacing_px =h_line_spacing_conf ,
+            v_char_spacing_px =v_char_spacing_conf ,
+            v_col_spacing_px =v_col_spacing_conf ,
             h_manual_break_extra_px =h_manual_break_extra_conf ,
-            v_manual_break_extra_px =v_manual_break_extra_conf )
+            v_manual_break_extra_px =v_manual_break_extra_conf 
+            )
+            if rendered_block_content_pil :
+                final_surface_to_paste =rendered_block_content_pil 
+                if angle !=0 :
+                    try :
+                        final_surface_to_paste =rendered_block_content_pil .rotate (
+                        -angle ,
+                        expand =True ,
+                        resample =Image .Resampling .BICUBIC ,
+                        fillcolor =(0 ,0 ,0 ,0 )
+                        )
+                    except Exception as e :
+                        print (f"Error rotating block {idx} content: {e}")
+                        final_surface_to_paste =rendered_block_content_pil 
+                block_center_x_orig =(block_item .bbox [0 ]+block_item .bbox [2 ])/2.0 
+                block_center_y_orig =(block_item .bbox [1 ]+block_item .bbox [3 ])/2.0 
+                paste_x =int (round (block_center_x_orig -(final_surface_to_paste .width /2.0 )))
+                paste_y =int (round (block_center_y_orig -(final_surface_to_paste .height /2.0 )))
+                try :
+                    if final_surface_to_paste .mode =='RGBA':
+                        base_image .alpha_composite (final_surface_to_paste ,(paste_x ,paste_y ))
+                    else :
+                         base_image .paste (final_surface_to_paste ,(paste_x ,paste_y ))
+                except ValueError as ve :
+                     print (f"Error pasting block {idx} at ({paste_x}, {paste_y}): {ve}. Block bbox: {block_item.bbox}")
+                except Exception as e_paste :
+                    print (f"Error compositing/pasting block {idx} ('{block_item.translated_text[:10]}...'): {e_paste}")
         return base_image 
     except Exception as e :
-        print (f"错误(draw_processed_blocks_pil): {e}")
+        print (f"严重错误 (draw_processed_blocks_pil): {e}")
         import traceback 
         traceback .print_exc ()
         return pil_image_original 
