@@ -17,15 +17,17 @@ from utils.font_utils import (
 if PILLOW_AVAILABLE:
     from PIL import Image, ImageDraw, ImageFont
 try:
-    from openai import OpenAI, APITimeoutError, APIError
+    from google import genai
+    from google.genai import types as google_genai_types
 
-    OPENAI_LIB_AVAILABLE = True
+    GENAI_LIB_AVAILABLE = True
 except ImportError:
-    OPENAI_LIB_AVAILABLE = False
-    OpenAI = None
-    APITimeoutError = None
-    APIError = None
-    print("警告: 未安装 openai 库。Gemini (OpenAI兼容模式) 功能将不可用。")
+    GENAI_LIB_AVAILABLE = False
+    genai = None
+    google_genai_types = None
+    print(
+        "警告: 未安装 google-genai 库。Gemini 功能将不可用。请确认已执行 pip install -U -q 'google-genai'"
+    )
 try:
     import numpy as np
 
@@ -84,7 +86,8 @@ class ImageProcessor:
         self.config_manager = config_manager
         self.last_error = None
         self.dependencies = self._check_internal_dependencies()
-        self.openai_client: OpenAI | None = None
+        self.genai_client: genai.Client | None = None
+        self.configured_model_name: str | None = None
         self._apply_proxy_settings_to_env()
         self.font_size_mapping = {
             "very_small": self.config_manager.getint(
@@ -124,36 +127,34 @@ class ImageProcessor:
     def _check_internal_dependencies(self):
         return {
             "pillow": PILLOW_AVAILABLE,
-            "openai_lib": OPENAI_LIB_AVAILABLE,
+            "genai_lib": GENAI_LIB_AVAILABLE,
             "numpy": NUMPY_AVAILABLE,
         }
 
-    def _configure_openai_client_if_needed(self) -> bool:
-        if not self.dependencies["openai_lib"]:
-            self.last_error = "OpenAI 库未加载。"
+    def _configure_genai_client_if_needed(self) -> bool:
+        if not self.dependencies["genai_lib"] or not genai:
+            self.last_error = "Google Gen AI 库 (google-genai) 未加载。"
             return False
         api_key = self.config_manager.get("GeminiAPI", "api_key")
-        if not api_key:
-            self.last_error = "Gemini API 密钥 (用于 OpenAI 兼容模式) 未在配置中找到。"
-            return False
-        gemini_base_url_config = self.config_manager.get(
-            "GeminiAPI", "gemini_base_url", fallback=""
-        ).strip()
-        actual_base_url_for_gemini = (
-            "https://generativelanguage.googleapis.com/v1beta/openai/"
-        )
-        if gemini_base_url_config:
-            actual_base_url_for_gemini = gemini_base_url_config
-            if not actual_base_url_for_gemini.endswith("/"):
-                actual_base_url_for_gemini += "/"
         try:
-            self.openai_client = OpenAI(
-                api_key=api_key, base_url=actual_base_url_for_gemini
+            if api_key:
+                self.genai_client = genai.Client(api_key=api_key)
+            else:
+                self.genai_client = genai.Client()
+            self.configured_model_name = self.config_manager.get(
+                "GeminiAPI", "model_name", "gemini-1.5-flash-latest"
             )
+            if self.configured_model_name.startswith("models/"):
+                print(
+                    f"Info: Model name starts with 'models/'. The new SDK might not require this prefix. Using '{self.configured_model_name}'."
+                )
             return True
         except Exception as e:
-            self.last_error = f"配置 OpenAI 客户端 (Gemini 兼容模式) 时发生错误: {e}"
-            self.openai_client = None
+            self.last_error = (
+                f"配置 Google Gen AI SDK (google-genai) 客户端时发生错误: {e}"
+            )
+            self.genai_client = None
+            self.configured_model_name = None
             return False
 
     def get_last_error(self) -> str | None:
@@ -242,25 +243,29 @@ class ImageProcessor:
                 dummy_draw,
                 block.translated_text,
                 pil_font_for_calc,
-                max_dim=int(max_content_width_for_wrapping),
-                orientation="horizontal",
-                char_spacing_px=h_char_spacing_px,
-                line_or_col_spacing_px=h_line_spacing_px,
+                int(max_content_width_for_wrapping),
+                "horizontal",
+                h_char_spacing_px,
+                h_line_spacing_px,
             )
-            needed_content_width_unpadded = max_w_achieved
-            needed_content_height_unpadded = total_h
+            needed_content_width_unpadded, needed_content_height_unpadded = (
+                max_w_achieved,
+                total_h,
+            )
         else:
             _, total_w, _, max_h_achieved = wrap_text_pil(
                 dummy_draw,
                 block.translated_text,
                 pil_font_for_calc,
-                max_dim=int(max_content_height_for_wrapping),
-                orientation="vertical",
-                char_spacing_px=v_char_spacing_px,
-                line_or_col_spacing_px=v_col_spacing_px,
+                int(max_content_height_for_wrapping),
+                "vertical",
+                v_char_spacing_px,
+                v_col_spacing_px,
             )
-            needed_content_width_unpadded = total_w
-            needed_content_height_unpadded = max_h_achieved
+            needed_content_width_unpadded, needed_content_height_unpadded = (
+                total_w,
+                max_h_achieved,
+            )
         if (
             needed_content_width_unpadded <= 0
             and needed_content_height_unpadded <= 0
@@ -268,17 +273,18 @@ class ImageProcessor:
             and block.translated_text.strip()
         ):
             return
-        required_bbox_width = needed_content_width_unpadded + (2 * text_padding)
-        required_bbox_height = needed_content_height_unpadded + (2 * text_padding)
+        required_bbox_width, required_bbox_height = needed_content_width_unpadded + (
+            2 * text_padding
+        ), needed_content_height_unpadded + (2 * text_padding)
         if required_bbox_width <= 0 or required_bbox_height <= 0:
             return
-        center_x = (block.bbox[0] + block.bbox[2]) / 2.0
-        center_y = (block.bbox[1] + block.bbox[3]) / 2.0
-        final_bbox_width = required_bbox_width
-        final_bbox_height = required_bbox_height
+        center_x, center_y = (block.bbox[0] + block.bbox[2]) / 2.0, (
+            block.bbox[1] + block.bbox[3]
+        ) / 2.0
         min_dim_after_adjust = 10
-        final_bbox_width = max(final_bbox_width, min_dim_after_adjust)
-        final_bbox_height = max(final_bbox_height, min_dim_after_adjust)
+        final_bbox_width, final_bbox_height = max(
+            required_bbox_width, min_dim_after_adjust
+        ), max(required_bbox_height, min_dim_after_adjust)
         block.bbox = [
             center_x - final_bbox_width / 2.0,
             center_y - final_bbox_height / 2.0,
@@ -352,8 +358,9 @@ class ImageProcessor:
             try:
                 if upscale_factor_conf > 1.0 and upscale_factor_conf != 1.0:
                     original_llm_width, original_llm_height = pil_image_for_llm.size
-                    new_llm_width = int(original_llm_width * upscale_factor_conf)
-                    new_llm_height = int(original_llm_height * upscale_factor_conf)
+                    new_llm_width, new_llm_height = int(
+                        original_llm_width * upscale_factor_conf
+                    ), int(original_llm_height * upscale_factor_conf)
                     pil_image_for_llm = pil_image_for_llm.resize(
                         (new_llm_width, new_llm_height), resample_filter
                     )
@@ -363,25 +370,30 @@ class ImageProcessor:
                 if contrast_factor_conf != 1.0 and NUMPY_AVAILABLE:
                     img_array = np.array(pil_image_for_llm).astype(np.float32)
                     if img_array.ndim == 3 and img_array.shape[2] == 4:
-                        rgb_channels = img_array[:, :, :3]
-                        alpha_channel = img_array[:, :, 3]
-                        rgb_channels = (
-                            contrast_factor_conf * (rgb_channels - 128.0) + 128.0
+                        rgb_channels, alpha_channel = (
+                            img_array[:, :, :3],
+                            img_array[:, :, 3],
                         )
-                        rgb_channels = np.clip(rgb_channels, 0, 255)
-                        processed_img_array = np.dstack((rgb_channels, alpha_channel))
+                        rgb_channels = np.clip(
+                            contrast_factor_conf * (rgb_channels - 128.0) + 128.0,
+                            0,
+                            255,
+                        )
                         pil_image_for_llm = Image.fromarray(
-                            processed_img_array.astype(np.uint8), "RGBA"
+                            np.dstack((rgb_channels, alpha_channel)).astype(np.uint8),
+                            "RGBA",
                         )
                     elif img_array.ndim == 3 and img_array.shape[2] == 3:
-                        img_array = contrast_factor_conf * (img_array - 128.0) + 128.0
-                        img_array = np.clip(img_array, 0, 255)
+                        img_array = np.clip(
+                            contrast_factor_conf * (img_array - 128.0) + 128.0, 0, 255
+                        )
                         pil_image_for_llm = Image.fromarray(
                             img_array.astype(np.uint8), "RGB"
                         )
                     elif img_array.ndim == 2:
-                        img_array = contrast_factor_conf * (img_array - 128.0) + 128.0
-                        img_array = np.clip(img_array, 0, 255)
+                        img_array = np.clip(
+                            contrast_factor_conf * (img_array - 128.0) + 128.0, 0, 255
+                        )
                         pil_image_for_llm = Image.fromarray(
                             img_array.astype(np.uint8), "L"
                         )
@@ -394,28 +406,22 @@ class ImageProcessor:
                 _report_progress(8, f"警告: LLM图像预处理失败: {e_preprocess}")
                 pil_image_for_llm = pil_image_original.copy()
         intermediate_blocks_for_processing: list[dict] = []
-        _report_progress(10, "使用 Gemini (OpenAI 兼容模式) 进行OCR和翻译...")
-        if not self.dependencies["openai_lib"]:
-            self.last_error = "OpenAI 库未安装，无法使用 Gemini 进行处理。"
+        _report_progress(10, "使用 Gemini (google-genai SDK) 进行OCR和翻译...")
+        if not self.dependencies["genai_lib"] or not genai or not google_genai_types:
+            self.last_error = "Google Gen AI 库 (google-genai) 或其类型模块未正确加载。"
             _report_progress(100, f"错误: {self.last_error}")
             return None
-        if not self._configure_openai_client_if_needed() or not self.openai_client:
+        if (
+            not self._configure_genai_client_if_needed()
+            or not self.genai_client
+            or not self.configured_model_name
+        ):
             _report_progress(
-                100, f"错误: {self.last_error or 'OpenAI Client 配置失败。'}"
+                100,
+                f"错误: {self.last_error or 'Google Gen AI Client 或模型名称配置失败。'}",
             )
             return None
-        configured_model_name = self.config_manager.get(
-            "GeminiAPI", "model_name", "gemini-1.5-flash-latest"
-        )
-        gemini_model_for_api_call = (
-            configured_model_name.split("/")[-1]
-            if configured_model_name.startswith("models/")
-            else configured_model_name
-        )
-        _report_progress(25, f"模型: {gemini_model_for_api_call}...")
-        request_timeout_seconds = self.config_manager.getint(
-            "GeminiAPI", "request_timeout", fallback=60
-        )
+        _report_progress(25, f"模型: {self.configured_model_name}...")
         raw_response_text = ""
         cleaned_json_text = ""
         try:
@@ -430,7 +436,7 @@ class ImageProcessor:
             raw_glossary_text = self.config_manager.get(
                 "GeminiAPI", "glossary_text", fallback=""
             ).strip()
-            glossary_instructions = ""
+            glossary_section_for_prompt = ""
             if raw_glossary_text:
                 glossary_lines = [
                     line.strip()
@@ -438,21 +444,13 @@ class ImageProcessor:
                     if line.strip() and "->" in line.strip()
                 ]
                 if glossary_lines:
-                    formatted_glossary = "\n".join(glossary_lines)
-                    glossary_instructions = f"""
+                    actual_glossary_content = "\n".join(glossary_lines)
+                    glossary_section_for_prompt = f"""
 IMPORTANT: When translating, strictly adhere to the following glossary (source_term->target_term format). Apply these translations wherever applicable:
 <glossary>
-{formatted_glossary}
+{actual_glossary_content}
 </glossary>
 """
-                else:
-                    glossary_instructions = (
-                        "\nNo specific glossary provided for this translation task.\n"
-                    )
-            else:
-                glossary_instructions = (
-                    "\nNo specific glossary provided for this translation task.\n"
-                )
             prompt_text_for_api = f"""You are an expert AI assistant specializing in image understanding, OCR (Optical Character Recognition), and translation. Your task is to meticulously analyze the provided image, identify {source_language_from_config} text blocks, extract their content, and translate them into {target_language}, adhering strictly to the output format.
 Follow these steps precisely:
 1.  **Image Type Analysis:**
@@ -462,7 +460,7 @@ Follow these steps precisely:
 2.  **{source_language_from_config} Text Block Identification and Extraction (Conditional on Image Type):**
     *   **For Manga/Comic Pages (1.a):**
         *   Prioritize {source_language_from_config} text within speech bubbles, dialogue balloons, and thought bubbles.
-        *   Extract clearly legible {source_language_from_config} onomatopoeia (e.g., {"ドン, バン, ゴゴゴ" if source_language_from_config.lower() == 'japanese' else "SFX, SOUND_EFFECT"} - adjust example based on language or make generic) if visually prominent and part of the narrative.
+        *   Extract clearly legible {source_language_from_config} onomatopoeia (e.g., {"ドン, バン, ゴゴゴ" if source_language_from_config.lower() == 'japanese' else "SFX, SOUND_EFFECT"}) if visually prominent and part of the narrative.
         *   Extract {source_language_from_config} text from distinct narrative boxes.
         *   Extract significant, long {source_language_from_config} dialogue/narrative passages not in bubbles/boxes but clearly part of storytelling.
         *   Generally, ignore {source_language_from_config} text in complex backgrounds, tiny ancillary details, or decorative elements unless they are crucial narrative/onomatopoeia. Focus on text essential for story/dialogue.
@@ -473,19 +471,19 @@ Follow these steps precisely:
     a.  **Original Text:** Extract the complete, exact {source_language_from_config} text.
     b.  **Orientation:** Determine its primary orientation: "horizontal", "vertical_ltr" (left-to-right), or "vertical_rtl" (right-to-left).
     c.  **Bounding Box (Critical):**
-        *   Provide a **PRECISE and TIGHT** normalized bounding box for the *{source_language_from_config} text characters themselves*.
-        *   Format: `[x_min_norm, y_min_norm, x_max_norm, y_max_norm]`.
-        *   Coordinates must be normalized floats between 0.0 and 1.0 (e.g., 0.152, not 152). Use 3-4 decimal places.
+        *   Provide a **PRECISE and TIGHT** bounding box for the *{source_language_from_config} text characters themselves*.
+        *   Format: `[y_min_norm, x_min_norm, y_max_norm, x_max_norm]`.
+        *   Coordinates must be normalized **integers** between 0 and 1000 (e.g., 152, not 0.152).
         *   The box must be the smallest rectangle that **fully encloses all {source_language_from_config} text characters** of that block.
         *   Minimize surrounding whitespace, but ensure the box has a sensible, non-zero width and height appropriate for the text.
         *   **Crucially, DO NOT include non-text elements** like speech bubble outlines, tails, or large empty areas of a dialogue box, unless these are unavoidably intertwined with the text characters. Focus on the text's actual footprint.
         *   Ensure `x_min_norm < x_max_norm` and `y_min_norm < y_max_norm`. The box must have a non-zero area.
     d.  **Font Size Category:** Classify its visual size relative to the image and other text as: "very_small", "small", "medium", "large", or "very_large".
     e.  **Translation:** Translate the extracted {source_language_from_config} text into fluent and natural {target_language}. **Pay attention to the visual context (scene, character expressions) and dialogue flow/atmosphere to ensure the translation accurately reflects the original tone, mood, and nuance, maintaining translation accuracy.**
-{glossary_instructions}
+{glossary_section_for_prompt}
 4.  **Output Format (Strictly JSON):**
     *   Return a JSON list of objects. Each object represents one processed text block.
-    *   Each object MUST contain these exact keys: "original_text" (string), "translated_text" (string), "orientation" (string), "bounding_box" (list of 4 floats), "font_size_category" (string).
+    *   Each object MUST contain these exact keys: "original_text" (string), "translated_text" (string), "orientation" (string), "bounding_box" (list of 4 integers, representing y_min, x_min, y_max, x_max normalized to 0-1000), "font_size_category" (string).
     *   Example (if {source_language_from_config} is Japanese and target_language is English, for a manga image):
       ```json
       [
@@ -493,67 +491,78 @@ Follow these steps precisely:
           "original_text": "何だ！？",
           "translated_text": "What is it!?",
           "orientation": "vertical_rtl",
-          "bounding_box": [0.152, 0.201, 0.250, 0.355],
+          "bounding_box": [201, 152, 355, 250],
           "font_size_category": "medium"
         }},
         {{
           "original_text": "ドーン！",
           "translated_text": "BOOM!",
           "orientation": "horizontal",
-          "bounding_box": [0.600, 0.705, 0.780, 0.800],
+          "bounding_box": [705, 600, 800, 780],
           "font_size_category": "large"
         }}
       ]
       ```
-    (Consider making the example more generic if `source_language_from_config` is not Japanese, e.g., "Original Text Example", "Translated Example")
 5.  **No Text Found:** If no qualifying {source_language_from_config} text blocks are found in the image, return an empty JSON list: `[]`.
 6.  **JSON Purity:** The output MUST be *only* the raw JSON string. Do NOT include any explanatory text, comments, or markdown formatting (like ` ```json ... ``` `) outside of the JSON list itself.
 """
             if pil_image_for_llm is None:
-                raise ValueError("PIL Image for LLM is None before encoding.")
-            base64_image_string = self._encode_pil_image_to_base64(
-                pil_image_for_llm, image_format="PNG"
-            )
-            messages_payload = [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt_text_for_api},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{base64_image_string}"
-                            },
-                        },
-                    ],
-                }
-            ]
+                raise ValueError("PIL Image for LLM is None before API call.")
             if _check_cancelled():
                 return None
-            api_params = {
-                "model": gemini_model_for_api_call,
-                "messages": messages_payload,
-                "timeout": float(request_timeout_seconds),
-                "temperature": 0.5,
-                "reasoning_effort": "high",
-            }
-            response = self.openai_client.chat.completions.create(**api_params)
-            if (
-                response.choices
-                and response.choices[0].message
-                and response.choices[0].message.content
-            ):
-                raw_response_text = response.choices[0].message.content.strip()
+            request_contents = [prompt_text_for_api, pil_image_for_llm]
+            current_generation_config = None
+            if google_genai_types:
+                thinking_config_obj = google_genai_types.ThinkingConfig(
+                    thinking_budget=21145
+                )
+                current_generation_config = google_genai_types.GenerateContentConfig(
+                    temperature=0.5,
+                    response_mime_type="application/json",
+                    thinking_config=thinking_config_obj,
+                )
             else:
-                self.last_error = "OpenAI 兼容 Gemini API 未返回有效内容。"
-                raise ValueError("API did not return content.")
-            cleaned_json_text = raw_response_text
+                self.last_error = "Google Gen AI types 模块不可用，无法设置 thinking_config (内部错误)。"
+                _report_progress(100, f"错误: {self.last_error}")
+                return None
+            response = self.genai_client.models.generate_content(
+                model=self.configured_model_name,
+                contents=request_contents,
+                config=current_generation_config,
+            )
+            if hasattr(response, "text") and response.text:
+                raw_response_text = response.text
+            elif (
+                hasattr(response, "candidates")
+                and response.candidates
+                and hasattr(response.candidates[0], "content")
+                and response.candidates[0].content
+                and hasattr(response.candidates[0].content, "parts")
+                and response.candidates[0].content.parts
+            ):
+                raw_response_text = "".join(
+                    part.text
+                    for part in response.candidates[0].content.parts
+                    if hasattr(part, "text")
+                )
+            else:
+                feedback_msg = ""
+                if hasattr(response, "prompt_feedback"):
+                    feedback_msg = f" Prompt Feedback: {response.prompt_feedback}"
+                self.last_error = (
+                    f"Gemini API (google-genai) 未返回有效内容文本.{feedback_msg}"
+                )
+                _report_progress(75, f"错误: {self.last_error}")
+                return None
+            cleaned_json_text = raw_response_text.strip()
             if cleaned_json_text.startswith("```json"):
                 cleaned_json_text = cleaned_json_text[7:]
+                if cleaned_json_text.endswith("```"):
+                    cleaned_json_text = cleaned_json_text[:-3]
             elif cleaned_json_text.startswith("```"):
                 cleaned_json_text = cleaned_json_text[3:]
-            if cleaned_json_text.endswith("```"):
-                cleaned_json_text = cleaned_json_text[:-3]
+                if cleaned_json_text.endswith("```"):
+                    cleaned_json_text = cleaned_json_text[:-3]
             cleaned_json_text = cleaned_json_text.strip()
             if not cleaned_json_text or cleaned_json_text == "[]":
                 _report_progress(75, "Gemini 未检测到文本或返回空列表。")
@@ -581,6 +590,30 @@ Follow these steps precisely:
                             in self.font_size_mapping.keys()
                         ):
                             try:
+                                gemini_bbox_values = [
+                                    int(c) for c in item_data["bounding_box"]
+                                ]
+                                y_gem_min, x_gem_min, y_gem_max, x_gem_max = (
+                                    gemini_bbox_values
+                                )
+                                internal_x_min_n = x_gem_min / 1000.0
+                                internal_y_min_n = y_gem_min / 1000.0
+                                internal_x_max_n = x_gem_max / 1000.0
+                                internal_y_max_n = y_gem_max / 1000.0
+                                internal_x_min_n = max(0.0, min(1.0, internal_x_min_n))
+                                internal_y_min_n = max(0.0, min(1.0, internal_y_min_n))
+                                internal_x_max_n = max(0.0, min(1.0, internal_x_max_n))
+                                internal_y_max_n = max(0.0, min(1.0, internal_y_max_n))
+                                final_x_min_n = min(internal_x_min_n, internal_x_max_n)
+                                final_y_min_n = min(internal_y_min_n, internal_y_max_n)
+                                final_x_max_n = max(internal_x_min_n, internal_x_max_n)
+                                final_y_max_n = max(internal_y_min_n, internal_y_max_n)
+                                normalized_bbox_for_internal_use = [
+                                    final_x_min_n,
+                                    final_y_min_n,
+                                    final_x_max_n,
+                                    final_y_max_n,
+                                ]
                                 intermediate_blocks_for_processing.append(
                                     {
                                         "id": f"gemini_multimodal_{item_idx}",
@@ -590,9 +623,7 @@ Follow these steps precisely:
                                         "translated_text": str(
                                             item_data["translated_text"]
                                         ),
-                                        "bbox_norm": [
-                                            float(c) for c in item_data["bounding_box"]
-                                        ],
+                                        "bbox_norm": normalized_bbox_for_internal_use,
                                         "orientation": str(item_data["orientation"]),
                                         "font_size_category": str(
                                             item_data["font_size_category"]
@@ -602,7 +633,7 @@ Follow these steps precisely:
                             except (ValueError, TypeError) as e:
                                 _report_progress(
                                     75,
-                                    f"警告: 解析Gemini某数据块时出错: {e} - {item_data}",
+                                    f"警告: 解析Gemini某数据块时出错 (bbox): {e} - {item_data}",
                                 )
                         else:
                             _report_progress(
@@ -620,28 +651,14 @@ Follow these steps precisely:
         except json.JSONDecodeError as json_err:
             self.last_error = f"解析 Gemini JSON失败: {json_err}. 响应: {cleaned_json_text[:500] if cleaned_json_text else raw_response_text[:500]}"
             _report_progress(75, "错误: 解析Gemini JSON失败。")
-        except AttributeError as attr_err:
-            self.last_error = (
-                f"Gemini 响应获取文本失败 (可能安全过滤或结构错误): {attr_err}."
-            )
-            _report_progress(75, "错误: Gemini响应结构问题。")
-        except APITimeoutError as timeout_error:
-            self.last_error = (
-                f"Gemini API 请求超时 ({request_timeout_seconds}s): {timeout_error}"
-            )
-            _report_progress(75, "错误: Gemini API超时。")
-        except APIError as api_error:
-            self.last_error = f"Gemini API 调用失败 (APIError): {api_error}"
-            _report_progress(75, "错误: Gemini API调用失败。")
-        except ValueError as val_err:
-            self.last_error = str(val_err)
-            _report_progress(75, f"错误: {self.last_error}")
         except Exception as gemini_err:
-            self.last_error = f"Gemini API 未知错误: {gemini_err}"
+            self.last_error = (
+                f"Gemini API (google-genai) 调用/处理时发生错误: {gemini_err}"
+            )
             import traceback
 
             traceback.print_exc()
-            _report_progress(75, "错误: Gemini API未知错误。")
+            _report_progress(75, f"错误: {self.last_error}")
         if _check_cancelled():
             return None
         _report_progress(
@@ -652,20 +669,16 @@ Follow these steps precisely:
             pixel_bbox = []
             if "bbox_norm" in iblock_data:
                 norm_bbox = iblock_data["bbox_norm"]
-                if not (isinstance(norm_bbox, list) and len(norm_bbox) == 4):
+                if not (
+                    isinstance(norm_bbox, list)
+                    and len(norm_bbox) == 4
+                    and all(isinstance(c, float) for c in norm_bbox)
+                ):
                     print(
-                        f"警告: 无效的 bbox_norm 格式: {norm_bbox} for block data: {iblock_data.get('original_text', '')[:20]}"
+                        f"警告: 无效的内部 bbox_norm 格式: {norm_bbox} for block data: {iblock_data.get('original_text', '')[:20]}"
                     )
                     continue
-                try:
-                    x_min_n, y_min_n, x_max_n, y_max_n = [
-                        max(0.0, min(1.0, float(c))) for c in norm_bbox
-                    ]
-                except (TypeError, ValueError) as e:
-                    print(
-                        f"警告: bbox_norm 坐标转换失败: {e} - 数据: {norm_bbox} for block data: {iblock_data.get('original_text', '')[:20]}"
-                    )
-                    continue
+                x_min_n, y_min_n, x_max_n, y_max_n = norm_bbox
                 if img_width > 0 and img_height > 0:
                     pixel_bbox = [
                         x_min_n * img_width,
@@ -678,18 +691,21 @@ Follow these steps precisely:
                     continue
             else:
                 print(
-                    f"警告: Gemini 返回的数据块缺少 bbox_norm: {iblock_data.get('original_text', '')[:20]}"
+                    f"警告: 中间数据块缺少 bbox_norm: {iblock_data.get('original_text', '')[:20]}"
                 )
                 continue
             if not (
                 pixel_bbox
                 and len(pixel_bbox) == 4
                 and all(isinstance(c, (int, float)) for c in pixel_bbox)
-                and pixel_bbox[0] < pixel_bbox[2]
-                and pixel_bbox[1] < pixel_bbox[3]
             ):
                 print(
-                    f"警告: 无效的像素 BBox: {pixel_bbox} for block data: {iblock_data.get('original_text', '')[:20]}"
+                    f"警告: 无效的像素 BBox (类型或长度): {pixel_bbox} for block data: {iblock_data.get('original_text', '')[:20]}"
+                )
+                continue
+            if not (pixel_bbox[2] > pixel_bbox[0] and pixel_bbox[3] > pixel_bbox[1]):
+                print(
+                    f"警告: 无效的像素 BBox (width/height non-positive): {pixel_bbox} for block data: {iblock_data.get('original_text', '')[:20]}"
                 )
                 continue
             font_size_cat = iblock_data.get("font_size_category", "medium")
